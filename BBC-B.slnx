@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="BBC-B-EM/BBC-B.csproj" />
+  <Project Path="BBC-B-Tests/BBC-B-Tests.csproj" />
+</Solution>
