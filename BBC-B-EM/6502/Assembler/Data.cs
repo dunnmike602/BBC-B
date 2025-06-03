@@ -1,5 +1,6 @@
 ﻿namespace MLDComputing.Emulators.BBCSim._6502.Assembler;
 
+using Engine.Enums;
 using Validators;
 using Validators.Interfaces;
 
@@ -63,7 +64,6 @@ public static class Data
     public const string TYA = "TYA";
     public const string BYTE = ".BYTE";
     public const string ORG = ".ORG";
-    public const string KIL = "KIL";
     public const string VAR = ".VAR";
     public const string DBG = "DBG";
 
@@ -95,13 +95,10 @@ public static class Data
     {
         var instructions = new Instruction[byte.MaxValue];
 
-        var nopInstruction = Definitions.SelectMany(definition => definition.Instructions)
-            .First(instruction => instruction.Mnemonic == NOP);
-
-        // Preset all instructions to NOP
+        // Preset all instructions to blank instruction
         for (var index = 0; index < instructions.Length; index++)
         {
-            instructions[index] = nopInstruction;
+            instructions[index] = new Instruction();
         }
 
         foreach (var instruction in Definitions.SelectMany(definition => definition.Instructions)
@@ -132,7 +129,7 @@ public static class Data
         }
     }
 
-    public static Operation? MapOpCode(int opCode)
+    public static Operation? MapOpCode(byte opCode)
     {
         var mappedInstruction = (from definition in Definitions
             from instruction in definition.Instructions
@@ -149,11 +146,13 @@ public static class Data
             return null;
         }
 
-        return new Operation
+        var op = new Operation
         {
             ActualAddressingMode = mappedInstruction.AddressingMode,
             Definition = mappedDefinition
         };
+
+        return op;
     }
 
     public static void MapParameter(Operation operation)
@@ -227,16 +226,16 @@ public static class Data
             "AND Accumulator with memory using Indirect Indexed address.", "AND ($0000),Y");
         definitions.Add(operationDefinition);
 
-        operationDefinition = new OperationDefinition { Mnemonic = ASL };
-        SetOpCode(operationDefinition, AddressingModes.Accumulator, 0x0A, 1, 2,
+        operationDefinition = new OperationDefinition { Mnemonic = ASL, AccumulatorParameterRequired = false };
+        SetOpCode(operationDefinition, AddressingModes.Accumulator, (byte)OpCodeValues.ASLAccumulator, 1, 2,
             "Shift bits one to the left in the Accumulator.", "ASL A");
-        SetOpCode(operationDefinition, AddressingModes.ZeroPage, 0x06, 2, 5,
+        SetOpCode(operationDefinition, AddressingModes.ZeroPage, (byte)OpCodeValues.ASLZeroPage, 2, 5,
             "Shift bits one to the left in the Zero Page memory location.", "ASL $00");
-        SetOpCode(operationDefinition, AddressingModes.ZeroPageX, 0x16, 2, 6,
+        SetOpCode(operationDefinition, AddressingModes.ZeroPageX, (byte)OpCodeValues.ASLZeroPageX, 2, 6,
             "Shift bits one to the left in the Zero Page,X memory location.", "ASL $00,X");
-        SetOpCode(operationDefinition, AddressingModes.Absolute, 0x0E, 3, 6,
+        SetOpCode(operationDefinition, AddressingModes.Absolute, (byte)OpCodeValues.ASLAbsolute, 3, 6,
             "Shift bits one to the left in the Absolute memory location.", "ASL $0000");
-        SetOpCode(operationDefinition, AddressingModes.AbsoluteX, 0x1E, 3, 7,
+        SetOpCode(operationDefinition, AddressingModes.AbsoluteX, (byte)OpCodeValues.ASLAbsoluteX, 3, 7,
             "Shift bits one to the left in the Absolute,X memory location.", "ASL $0000,X");
         definitions.Add(operationDefinition);
 
@@ -458,7 +457,7 @@ public static class Data
             "Load the Y Register from the Absolute,X memory address.", "LDY $0000,X");
         definitions.Add(operationDefinition);
 
-        operationDefinition = new OperationDefinition { Mnemonic = LSR };
+        operationDefinition = new OperationDefinition { Mnemonic = LSR, AccumulatorParameterRequired = false };
         SetOpCode(operationDefinition, AddressingModes.Accumulator, 0x4A, 1, 2,
             "Shift bits in accumulator one place to the left.", "LSR A");
         SetOpCode(operationDefinition, AddressingModes.ZeroPage, 0x46, 2, 5,
@@ -512,7 +511,7 @@ public static class Data
             "Pull Processor Status register from the stack.", "PLP");
         definitions.Add(operationDefinition);
 
-        operationDefinition = new OperationDefinition { Mnemonic = ROL };
+        operationDefinition = new OperationDefinition { Mnemonic = ROL, AccumulatorParameterRequired = false };
         SetOpCode(operationDefinition, AddressingModes.Accumulator, 0x2A, 1, 2,
             "Rotate bits in the Accumulator one place to the left.", "ROL A");
         SetOpCode(operationDefinition, AddressingModes.ZeroPage, 0x26, 2, 5,
@@ -525,17 +524,17 @@ public static class Data
             "Rotate bits in Absolute,X memory location one place to the left.", "ROL #$0000,X");
         definitions.Add(operationDefinition);
 
-        operationDefinition = new OperationDefinition { Mnemonic = ROR };
+        operationDefinition = new OperationDefinition { Mnemonic = ROR, AccumulatorParameterRequired = false };
         SetOpCode(operationDefinition, AddressingModes.Accumulator, 0x6A, 1, 2,
-            "Rotate bits in the Accumulator one place to the right.", "ROL A");
+            "Rotate bits in the Accumulator one place to the right.", "ROR A");
         SetOpCode(operationDefinition, AddressingModes.ZeroPage, 0x66, 2, 5,
-            "Rotate bits in Zero Page memory location one place to the right.", "ROL $00");
+            "Rotate bits in Zero Page memory location one place to the right.", "ROR $00");
         SetOpCode(operationDefinition, AddressingModes.ZeroPageX, 0x76, 2, 6,
-            "Rotate bits in Zero Page,X memory location one place to the right.", "ROL $00,X");
+            "Rotate bits in Zero Page,X memory location one place to the right.", "ROR $00,X");
         SetOpCode(operationDefinition, AddressingModes.Absolute, 0x6E, 3, 6,
-            "Rotate bits in Absolute memory location one place to the right.", "ROL $0000");
+            "Rotate bits in Absolute memory location one place to the right.", "ROR $0000");
         SetOpCode(operationDefinition, AddressingModes.AbsoluteX, 0x7E, 3, 7,
-            "Rotate bits in Absolute,X memory location one place to the right.", "ROL $0000,X");
+            "Rotate bits in Absolute,X memory location one place to the right.", "ROR $0000,X");
         definitions.Add(operationDefinition);
 
         operationDefinition = new OperationDefinition { Mnemonic = RTI };
@@ -661,11 +660,6 @@ public static class Data
 
         operationDefinition = new OperationDefinition
             { Mnemonic = VAR, Sample = ".VAR X=$00", Description = "Assembler directive, declare a variable value." };
-        definitions.Add(operationDefinition);
-
-        operationDefinition = new OperationDefinition { Mnemonic = KIL };
-        SetOpCode(operationDefinition, AddressingModes.Implied, 0x42, 1, 0,
-            "Pseudo instruction that immediately terminates the running program.", "KIL");
         definitions.Add(operationDefinition);
 
         return definitions;

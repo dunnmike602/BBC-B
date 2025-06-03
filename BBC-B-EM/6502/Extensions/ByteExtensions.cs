@@ -45,6 +45,7 @@ public static class ByteExtensions
         return (source & (1 << (int)bitToGet)) == 1 << (int)bitToGet ? Bit.One : Bit.Zero;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static string ConvertToBase(this byte source, int radix)
     {
         var valueString = Convert.ToString(source, radix);
@@ -53,6 +54,7 @@ public static class ByteExtensions
         return valueString.PadLeft(maxValueString.Length, '0').ToUpper();
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static string ConvertToBaseWithPrefix(this byte source, int radix)
     {
         var labels = new Dictionary<int, string> { { 2, "b" }, { 8, "o" }, { 10, string.Empty }, { 16, "$" } };

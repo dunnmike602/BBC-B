@@ -1,0 +1,291 @@
+﻿<Window x:Class="MLDComputing.Emulators.BeebBox.Ui.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:components="clr-namespace:MLDComputing.Emulators.BeebBox.Ui.Components"
+        WindowStartupLocation="CenterScreen" Loaded="MainWindow_OnLoaded"
+        Title="BeebBox" Height="800" Width="1800">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="3*"></RowDefinition>
+            <RowDefinition Height="*"></RowDefinition>
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Vertical" Grid.Row="0" Grid.Column="0">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock  TextAlignment="Left" Name="FrameCount" HorizontalAlignment="Left" Width="118" Margin="5 5 5 5"></TextBlock>
+                <TextBlock TextAlignment="Left" Name="FrameRate"  Width="118" Margin="5 5 5 5"></TextBlock>
+                <TextBlock  TextAlignment="Left" Name="InsCount"  Margin="5 5 5 5"></TextBlock>
+                <TextBlock  TextAlignment="Left" Name="CpuSpeed"  Margin="5 5 5 5"></TextBlock>
+            </StackPanel>
+            <ScrollViewer>
+                <Canvas x:Name="TeletextCanvas"
+                        Background="Black"
+                        Width="800"  Height="500"  />
+            </ScrollViewer>
+        </StackPanel>
+        <Grid Grid.Column="0" Grid.Row="1">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                <TextBlock Margin="10 10 10 10" Text="CAPS LOCK" FontWeight="Bold"></TextBlock>
+                <components:Led x:Name="CapsLock" Margin="10 10 10 10"/>
+            </StackPanel>
+        </Grid>
+        <Grid Grid.Row="0" Grid.Column="1" Grid.RowSpan="2">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="17*"/>
+            <ColumnDefinition Width="32*"/>
+            <ColumnDefinition Width="420*"/>
+            <ColumnDefinition Width="165*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"></RowDefinition>
+            <RowDefinition Height="*"></RowDefinition>
+        </Grid.RowDefinitions>
+        <!-- TODO The Emulation screen will go here -->
+        <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="4">
+            <Grid.RowDefinitions>
+                <RowDefinition />
+                <RowDefinition />
+            </Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="0">
+                <Button Name="StartButton" Click="StartButton_OnClick" Height="20" Width="100" Content="(Re)Start" Margin="10 10 10 10"></Button>
+                <Slider Name="Slider" ValueChanged="Slider_OnValueChanged" Height="20" Width="170" Minimum="0" Maximum="1000" Margin="10 10 10 10" Value="0"></Slider>
+                <Button IsEnabled="False" Name="StepButton" Click="StepButton_OnClick" Height="20" Width="60" Content="Step" Margin="10 10 10 10"></Button>
+                <Button  Name="RefreshButton" Click="RefreshButton_OnClick" Height="20" Width="60" Content="Refresh" Margin="10 10 10 10"></Button>
+                <TextBlock TextAlignment="Left" Text="Stop After" Height="20" Width="80" Margin="10 10 0 10"></TextBlock>
+                <TextBox  TextAlignment="Left" Name="StopAfter" Height="20" Width="80" Margin="5 10 10 10"/>
+                <TextBlock TextAlignment="Left" Text="Debug Mode:" Height="20" Width="80" Margin="10 10 0 10"></TextBlock>
+                    <CheckBox Name="EnableProcessorEvents" Margin="5 10 10 10" Unchecked="EnableProcessorEvents_OnChecked"  Checked="EnableProcessorEvents_OnChecked"></CheckBox>
+            </StackPanel>
+            <Grid  Grid.Row="1" Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition />
+                    <ColumnDefinition />
+                    <ColumnDefinition />
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="200" />
+
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"  Grid.Row="0" Padding="2 2 3 2"><Run  Text="A"/></TextBlock>
+                <TextBlock Grid.Column="1" Foreground="Yellow" Background="Blue" Grid.Row="0" Padding="2 2 3 2"><Run  Text="IX"/></TextBlock>
+                <TextBlock Grid.Column="2" Grid.Row="0" Padding="2 2 3 2"><Run Text="I"/><Run Language="en-gb" Text="Y"/></TextBlock>
+                <TextBlock Grid.Column="3" Foreground="Yellow" Background="Blue" Grid.Row="0" Padding="2 2 3 2"><Run  Text="PC"/></TextBlock>
+                <TextBlock Grid.Column="4"  Grid.Row="0" Padding="2 2 3 2"><Run  Text="SP"/></TextBlock>
+                <TextBlock Grid.Column="5" Grid.Row="0" Padding="2 2 3 2"><Run  Text="STATUS"/></TextBlock>
+
+
+                <TextBlock Name="ACC"  Height="20" Grid.Column="0" VerticalAlignment="Top" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+                <TextBlock Name="ACCD" Height="20" Grid.Column="0" VerticalAlignment="Bottom" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+
+
+                <TextBlock Name="IX" Foreground="Yellow" Background="Blue" Height="20" Grid.Column="1" VerticalAlignment="Top" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+                <TextBlock Name="IXD" Foreground="Yellow" Background="Blue" Height="20" Grid.Column="1" VerticalAlignment="Bottom" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+                
+                <TextBlock Name="IY" Height="20" Grid.Column="2" VerticalAlignment="Top" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+                <TextBlock Name="IYD"  Height="20" Grid.Column="2" VerticalAlignment="Bottom" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+
+
+                <TextBlock Name="PC" Foreground="Yellow" Background="Blue" Height="20" Grid.Column="3" VerticalAlignment="Top" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+                <TextBlock Name="PCD" Foreground="Yellow" Background="Blue" Height="20" Grid.Column="3" VerticalAlignment="Bottom" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+
+
+                <TextBlock Name="SP" Height="20" Grid.Column="4" VerticalAlignment="Top" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+                <TextBlock Name="SPD"  Height="20" Grid.Column="4" VerticalAlignment="Bottom" Grid.Row="1"  Padding="2 0 3 2"></TextBlock>
+
+
+                <Grid Grid.Column="5" Grid.Row="1" Margin="0 0 10 5">
+                    <!-- Define 8 equal-width columns -->
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <!-- Two rows: header and values -->
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Row 0: flag letters -->
+                    <TextBlock Grid.Row="0" Foreground="White" Background="Red" Grid.Column="0" Text="N" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="V" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="0" Foreground="White" Background="Red" Grid.Column="2" Text="-" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="0" Grid.Column="3" Text="B" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="0" Foreground="White" Background="Red" Grid.Column="4" Text="D" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="0" Grid.Column="5" Text="I" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="0" Foreground="White" Background="Red" Grid.Column="6" Text="Z" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="0" Grid.Column="7" Text="C" TextAlignment="Center" HorizontalAlignment="Stretch" />
+
+                    <!-- Row 1: status value placeholders -->
+                    <TextBlock x:Name="StatusN" Grid.Row="1" Grid.Column="0" Foreground="White" Background="Red" Text="0" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock x:Name="StatusV" Grid.Row="1" Grid.Column="1" Text="0" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="1" Foreground="White" Background="Red" TextAlignment="Center" HorizontalAlignment="Stretch"/>
+                    <TextBlock x:Name="StatusB" Grid.Row="1" Grid.Column="3" Text="0" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock x:Name="StatusD" Grid.Row="1" Grid.Column="4" Foreground="White" Background="Red" Text="0" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock x:Name="StatusI" Grid.Row="1" Grid.Column="5" Text="0" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock x:Name="StatusZ" Grid.Row="1" Grid.Column="6" Foreground="White" Background="Red" Text="0" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                    <TextBlock x:Name="StatusC" Grid.Row="1" Grid.Column="7" Text="0" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                </Grid>
+            </Grid>
+        </Grid>
+        <TabControl Grid.ColumnSpan="4" Grid.Column="0" Grid.Row="3">
+            <TabItem Header="Disassembly">
+                <Grid >
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="95*"/>
+                        <ColumnDefinition Width="923*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2">
+                        <TextBlock HorizontalAlignment="Left" Margin="15,5,0,5" Text="Search:" FontWeight="Bold"></TextBlock>
+                        <TextBox Width="298" Name="Search" HorizontalAlignment="Left" Margin="5,5,0,5"  TextChanged="TextBoxBase_OnTextChanged"></TextBox>
+                        <TextBlock HorizontalAlignment="Left" Margin="15,5,0,5" Text="Code Label:" FontWeight="Bold"></TextBlock>
+                        <ComboBox Width="298"   ItemsSource="{Binding CodeLabelsData}" Name="CodeLabels" HorizontalAlignment="Left" Margin="5,5,0,5"   SelectionChanged="Label_OnSelectionChanged"/>
+                    </StackPanel>
+                    <DataGrid Name="DissGrid" Grid.Row="1" SelectionMode="Single" AllowDrop="False" CanUserSortColumns="False"
+                              CanUserAddRows="False" CanUserReorderColumns="False" CanUserResizeRows="True"
+                              CanUserDeleteRows="False" CanUserResizeColumns="True"
+                              ItemsSource="{Binding Disassembly,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"  
+                              VerticalScrollBarVisibility="Visible" AlternatingRowBackground = "LightBlue"
+                              AutoGenerateColumns="True"  Grid.Column="0" Grid.ColumnSpan="2">
+
+                        <DataGrid.Resources>
+                            <Style TargetType="DataGridColumnHeader">
+                                <EventSetter Event="Click" Handler="HeaderClick" />
+                            </Style>
+                        </DataGrid.Resources>
+                        <DataGrid.RowStyle>
+                            <Style TargetType="{x:Type DataGridRow}">
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True" >
+                                        <Setter Property="BorderBrush" Value="Blue" />
+                                        <Setter Property="BorderThickness" Value="2" />
+                                    </Trigger>
+                                    <DataTrigger  Binding="{Binding Path=BreakPoint}" Value="True" >
+                                        <Setter Property="BorderBrush" Value="Red" />
+                                        <Setter Property="BorderThickness" Value="2" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+
+                            </Style>
+                        </DataGrid.RowStyle>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+                <TabItem Header="Stack">
+                    <Grid >
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <DataGrid  Grid.Row="0" SelectionMode="Single" AllowDrop="False" CanUserSortColumns="False"
+       CanUserAddRows="False" CanUserReorderColumns="False" CanUserResizeRows="True"
+       CanUserDeleteRows="False" CanUserResizeColumns="True"
+       ItemsSource="{Binding StackDisassembly,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"  
+       VerticalScrollBarVisibility="Visible" AlternatingRowBackground = "LightBlue"
+       AutoGenerateColumns="True" Grid.Column="0">
+
+                            <DataGrid.Resources>
+                                <Style TargetType="DataGridColumnHeader">
+                                    <EventSetter Event="Click" Handler="HeaderClick" />
+                                </Style>
+                            </DataGrid.Resources>
+                            <DataGrid.RowStyle>
+                                <Style TargetType="{x:Type DataGridRow}">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True" >
+                                            <Setter Property="BorderBrush" Value="Blue" />
+                                            <Setter Property="BorderThickness" Value="2" />
+                                        </Trigger>
+                                        <DataTrigger  Binding="{Binding Path=BreakPoint}" Value="True" >
+                                            <Setter Property="BorderBrush" Value="Red" />
+                                            <Setter Property="BorderThickness" Value="2" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+
+                                </Style>
+                            </DataGrid.RowStyle>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Data">
+                <Grid >
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="0">
+                        <TextBlock HorizontalAlignment="Left" Margin="15,5,0,5" Text="Search:" FontWeight="Bold"></TextBlock>
+                        <TextBox Width="298" Name="SearchData" HorizontalAlignment="Left" Margin="5,5,0,5"  TextChanged="SearchData_OnTextChanged"></TextBox>
+                        <TextBlock HorizontalAlignment="Left" Margin="15,5,0,5" Text="Data Label:" FontWeight="Bold"></TextBlock>
+                        <ComboBox Width="298"   ItemsSource="{Binding DataLabelsData}" Name="DataLabels" HorizontalAlignment="Left" Margin="5,5,0,5"   SelectionChanged="DataLabelsData_OnSelectionChanged"/>
+                    </StackPanel>
+                    <DataGrid Name="DataTableGrid" Grid.Row="1" SelectionMode="Single" AllowDrop="False" CanUserSortColumns="False"
+               CanUserAddRows="False" CanUserReorderColumns="False" CanUserResizeRows="True"
+               CanUserDeleteRows="False" CanUserResizeColumns="True"
+               ItemsSource="{Binding DataDisassembly,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"  
+               VerticalScrollBarVisibility="Visible" AlternatingRowBackground = "LightBlue"
+               AutoGenerateColumns="True" Grid.Column="0">
+
+                        <DataGrid.Resources>
+                            <Style TargetType="DataGridColumnHeader">
+                                <EventSetter Event="Click" Handler="HeaderClick" />
+                            </Style>
+                        </DataGrid.Resources>
+                        <DataGrid.RowStyle>
+                            <Style TargetType="{x:Type DataGridRow}">
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True" >
+                                        <Setter Property="BorderBrush" Value="Blue" />
+                                        <Setter Property="BorderThickness" Value="2" />
+                                    </Trigger>
+                                    <DataTrigger  Binding="{Binding Path=BreakPoint}" Value="True" >
+                                        <Setter Property="BorderBrush" Value="Red" />
+                                        <Setter Property="BorderThickness" Value="2" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+
+                            </Style>
+                        </DataGrid.RowStyle>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Error">
+                <TextBox Name="ErrorScreen" FontFamily="Courier New" AcceptsTab="True" TextWrapping="Wrap" IsReadOnlyCaretVisible="True" VerticalScrollBarVisibility="Auto"
+                >
+                    <TextBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Command="ApplicationCommands.Copy" Header="Copy"  >
+                                <MenuItem.Icon>
+                                    <Image Source="/Resources/Copy_16x.png"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator></Separator>
+                            <MenuItem Click="MenuItem_OnClick" Header="Clear"  >
+                                <MenuItem.Icon>
+                                    <Image Source="/Resources/ClearWindowContent_16x.png"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </TextBox.ContextMenu>
+                </TextBox>
+            </TabItem>
+        </TabControl>
+
+    </Grid>
+    </Grid>
+</Window>

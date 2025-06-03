@@ -1,4 +1,4 @@
-﻿namespace MLDComputing.Emulators.BBCSim._6502.Engine;
+﻿namespace MLDComputing.Emulators.BBCSim._6502.Engine.Enums;
 
 public enum OpCodeValues : byte
 {
@@ -174,7 +174,5 @@ public enum OpCodeValues : byte
     TSXImplied = 0xBA,
     TXAImplied = 0x8A,
     TXSImplied = 0x9A,
-    TYAImplied = 0x98,
-
-    KILImplied = 0x42
+    TYAImplied = 0x98
 }

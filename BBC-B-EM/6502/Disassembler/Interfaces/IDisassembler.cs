@@ -4,5 +4,5 @@ using Assembler;
 
 public interface IDisassembler
 {
-    List<Operation> Disassemble(byte[] memory, int start, int end, int radix);
+    List<Operation> Disassemble(Func<ushort, byte> readByte, ushort startAddress, ushort endAddress, int radix);
 }

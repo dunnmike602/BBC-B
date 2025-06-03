@@ -12,7 +12,24 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="6502\Engine\Enums\" />
+    <None Remove="6502\Disassembler\Resources\json.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Roms\" />
+  </ItemGroup>
+
+  <ItemGroup>
+	  <EmbeddedResource Include="6502\Disassembler\Resources\json.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Roms\BASIC2.rom">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Roms\OS12.rom">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

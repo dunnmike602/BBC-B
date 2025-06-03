@@ -5,41 +5,39 @@ using Interfaces;
 
 public class Disassembler(IAddressArgumentProcessor addressArgumentProcessor) : IDisassembler
 {
-    public List<Operation> Disassemble(byte[] memory, int start, int end, int radix)
+    public List<Operation> Disassemble(Func<ushort, byte> readByte, ushort startAddress, ushort endAddress, int radix)
     {
+        var labelMap = Helper.GetCodeLabelMap();
+
         var operations = new List<Operation>(0);
 
-        // Process at least 3 more bytes than end to ensure partial instructions are not mapped
-        var programCounter = start - 1;
-
-        var endValue = Math.Min(end + 3, ushort.MaxValue);
-
-        while (programCounter < endValue)
+        for (var programCounter = startAddress; programCounter <= endAddress; programCounter++)
         {
-            programCounter++;
-
-            var operation = Data.MapOpCode(memory[programCounter]);
+            var operation = Data.MapOpCode(readByte(programCounter));
 
             if (operation == null)
             {
                 continue;
             }
 
-            operation.ActualOpCode = memory[programCounter];
+            if (labelMap.TryGetValue(programCounter, out var value))
+            {
+                operation!.OSLabel = value.Name;
+            }
+
+            operation.ActualOpCode = readByte(programCounter);
 
             var parameterLength = operation.GetCurrentInstruction().Bytes - 1;
 
             operation.Parameters = new byte[parameterLength];
 
-            if (programCounter >= ushort.MaxValue)
+            for (var i = 0; i < parameterLength; i++)
             {
-                continue;
+                operation.Parameters[i] = readByte((ushort)(programCounter + 1 + i));
             }
 
-            Array.Copy(memory, programCounter + 1, operation.Parameters, 0, parameterLength);
-
             operation.MemoryAddress = programCounter;
-            programCounter += parameterLength;
+            programCounter += (ushort)parameterLength;
 
             operation.Argument = addressArgumentProcessor.MapToString(operation.ActualAddressingMode!.Value,
                 operation.Parameters, radix);
@@ -48,5 +46,12 @@ public class Disassembler(IAddressArgumentProcessor addressArgumentProcessor) : 
         }
 
         return operations;
+    }
+
+    public static IDisassembler Build()
+    {
+        var dis = new Disassembler(new AddressArgumentProcessor());
+
+        return dis;
     }
 }

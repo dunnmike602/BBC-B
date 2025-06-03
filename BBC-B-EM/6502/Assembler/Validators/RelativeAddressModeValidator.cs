@@ -65,7 +65,7 @@ public class RelativeAddressModeValidator : AddressModeValidator
             }
 
             // 3. Allow a + or - offset
-            if (operation.ArgumentIsExplictOffset())
+            if (operation.ArgumentIsExplicitOffset())
             {
                 var parsedOffsetValue = operation.Argument.ConvertToSByte();
 

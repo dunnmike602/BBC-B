@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows7.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>BeebBox</AssemblyName>
+    <RootNamespace>MLDComputing.Emulators.BeebBox</RootNamespace>
+    <ApplicationIcon>owl_icon-icons.com_55307.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="owl_icon-icons.com_55307.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.9.2" />
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.31" />
+    <PackageReference Include="ReactiveUI" Version="13.2.10" />
+    <PackageReference Include="ReactiveUI.Fody" Version="13.2.10" />
+    <PackageReference Include="ReactiveUI.WPF" Version="13.2.10" />
+    <PackageReference Include="Unity" Version="5.11.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Stateless">
+      <HintPath>Refs\Stateless.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Roms\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\BBC-B-EM\Roms\BASIC2.rom" Link="Roms\BASIC2.rom">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="..\BBC-B-EM\Roms\OS12.rom" Link="Roms\OS12.rom">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BBC-B-EM\BBC-B.csproj" />
+  </ItemGroup>
+
+</Project>

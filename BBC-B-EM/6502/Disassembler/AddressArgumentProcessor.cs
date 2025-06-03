@@ -2,7 +2,7 @@
 
 using Assembler;
 using Assembler.Validators;
-using Engine;
+using Constants;
 using Extensions;
 using Interfaces;
 
@@ -20,7 +20,7 @@ public class AddressArgumentProcessor : IAddressArgumentProcessor
                 return string.Empty;
 
             case AddressingModes.Accumulator:
-                return AccumulatorAddressModeValidator.AccumatorAddressIdentifier;
+                return AccumulatorAddressModeValidator.AccumlatorAddressIdentifier;
 
             case AddressingModes.ZeroPage:
                 return ((int)operands[0]).ConvertToBaseWithPrefix(radix, byte.MaxValue);
@@ -35,25 +35,30 @@ public class AddressArgumentProcessor : IAddressArgumentProcessor
                 return ((int)operands[0]).ConvertToBaseWithPrefix(radix, byte.MaxValue);
 
             case AddressingModes.Absolute:
-                return (operands[0] + operands[1] * Cpu6502.MsbMultiplier).ConvertToBaseWithPrefix(radix,
-                    ushort
-                        .MaxValue);
+                return (operands[0] + operands[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier)
+                    .ConvertToBaseWithPrefix(radix,
+                        ushort
+                            .MaxValue);
 
             case AddressingModes.AbsoluteX:
-                return (operands[0] + operands[1] * Cpu6502.MsbMultiplier).ConvertToBaseWithPrefix(radix,
+                return (operands[0] + operands[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier)
+                       .ConvertToBaseWithPrefix(radix,
                            ushort
                                .MaxValue) +
                        ",X";
 
             case AddressingModes.AbsoluteY:
-                return (operands[0] + operands[1] * Cpu6502.MsbMultiplier).ConvertToBaseWithPrefix(radix,
+                return (operands[0] + operands[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier)
+                       .ConvertToBaseWithPrefix(radix,
                            ushort
                                .MaxValue) +
                        ",Y";
 
             case AddressingModes.Indirect:
-                return "(" + (operands[0] + operands[1] * Cpu6502.MsbMultiplier).ConvertToBaseWithPrefix(radix,
-                    ushort.MaxValue) + ")";
+                return "(" + (operands[0] + operands[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier)
+                    .ConvertToBaseWithPrefix(
+                        radix,
+                        ushort.MaxValue) + ")";
 
             case AddressingModes.IndexedIndirect:
                 return "(" + ((int)operands[0]).ConvertToBaseWithPrefix(radix, byte.MaxValue) + ",X)";

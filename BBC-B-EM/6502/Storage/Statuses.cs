@@ -2,12 +2,12 @@
 
 public enum Statuses : byte
 {
-    CarryFlag = 0,
-    ZeroFlag,
+    Carry = 0,
+    Zero,
     InterruptDisable,
     DecimalMode,
     BreakCommand,
     Unused,
-    OverflowFlag,
-    NegativeFlag
+    Overflow,
+    Negative
 }

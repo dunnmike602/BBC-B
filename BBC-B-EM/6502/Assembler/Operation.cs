@@ -8,7 +8,11 @@ using Utilities;
 public class Operation
 {
     private string? _argument;
+
     private string? _labelName;
+
+    private string? _osLabel;
+
     private string? _variableName;
 
     public Operation()
@@ -73,9 +77,24 @@ public class Operation
         }
     }
 
+    public string? OSLabel
+    {
+        get => _osLabel;
+        set
+        {
+            if (value != null)
+            {
+                _osLabel = value;
+            }
+        }
+    }
+
     public OperationDefinition? Definition { get; set; }
+
     public AddressingModes? ActualAddressingMode { get; set; }
+
     public byte ActualOpCode { get; set; }
+
     public byte[] Parameters { get; set; }
 
     public byte[] GetEntireInstruction()
@@ -114,33 +133,10 @@ public class Operation
         return !string.IsNullOrWhiteSpace(Argument) && Regex.Match(Argument, @"^[^ ()]*:").Success;
     }
 
-    public bool ArgumentIsExplictOffset()
+    public bool ArgumentIsExplicitOffset()
     {
         return !string.IsNullOrWhiteSpace(Argument) && (Argument.Contains(TokenConstants.OffsetPlusMarker) ||
                                                         Argument.Contains(TokenConstants.OffsetMinusMarker));
-    }
-
-    public string? GetDescription()
-    {
-        if (!ActualAddressingMode.HasValue)
-        {
-            return Definition!.Description;
-        }
-
-        return GetCurrentInstruction().Description;
-    }
-
-    /// <summary>
-    ///     Strips spaces and any indexing from the argument (i.e ,X or ,Y)
-    /// </summary>
-    public string ParseArgumentCandidateFromArgument()
-    {
-        if (string.IsNullOrWhiteSpace(Argument))
-        {
-            return string.Empty;
-        }
-
-        return Regex.Match(Argument, RegularExpressionConstants.ValueOnlyRegEx).Value;
     }
 
     /// <summary>
@@ -307,6 +303,7 @@ public class Operation
     {
         return Definition!.Instructions[(int)ActualAddressingMode!];
     }
+
 
     /// <summary>
     ///     Sets up addressing mode based on the size of the value supplied

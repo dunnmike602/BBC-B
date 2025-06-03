@@ -1,8 +1,8 @@
 ﻿namespace MLDComputing.Emulators.BBCSim._6502.Assembler;
 
 using System.Text.RegularExpressions;
+using _6502.Constants;
 using Constants;
-using Engine;
 using Extensions;
 using Interfaces;
 
@@ -85,7 +85,7 @@ public class Assembler(Action<ushort, byte> writeByte) : IAssembler
             if (operation.IsAddressPseudoOperation)
             {
                 programCounter = (ushort)(operation.Parameters[0] + operation.Parameters[1] *
-                    Cpu6502.MsbMultiplier);
+                    ProcessorConstants.ProcessorSetup.MsbMultiplier);
                 operation.MemoryAddress = programCounter;
                 continue;
             }
@@ -134,7 +134,7 @@ public class Assembler(Action<ushort, byte> writeByte) : IAssembler
             if (variableOp != null)
             {
                 var variableValue = variableOp.Parameters[0] +
-                                    variableOp.Parameters[1] * Cpu6502.MsbMultiplier +
+                                    variableOp.Parameters[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier +
                                     GetOffset(innerOperation.VariableName);
 
                 // Pick Hi or Lo byte if appropriate
@@ -217,16 +217,17 @@ public class Assembler(Action<ushort, byte> writeByte) : IAssembler
                 break;
 
             case AddressingModes.Relative:
-                var offset = labelTarget.MemoryAddress - operation.MemoryAddress;
+                var offset = labelTarget.MemoryAddress - (operation.MemoryAddress + 2);
 
-                if (offset < Cpu6502.RelativeAddressBackwardsLimit || offset > Cpu6502.RelativeAddressForwardsLimit)
+                if (offset < ProcessorConstants.ProcessorSetup.RelativeAddressBackwardsLimit ||
+                    offset > ProcessorConstants.ProcessorSetup.RelativeAddressForwardsLimit)
                 {
                     operation.ErrorMessage = offset + " is an invalid relative address target.";
                     return false;
                 }
 
                 writeByte(startLocation, offset <= 0
-                    ? (byte)(offset - Cpu6502.ProgramCounterOffset)
+                    ? (byte)(offset - ProcessorConstants.ProcessorSetup.ProgramCounterOffset)
                     : (byte)offset);
                 break;
 

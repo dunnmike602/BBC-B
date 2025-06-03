@@ -1,42 +1,14 @@
 ﻿namespace BBC_B_Tests;
 
 using FluentAssertions;
-using MLDComputing.Emulators.BBCSim._6502.Assembler;
-using MLDComputing.Emulators.BBCSim._6502.Assembler.Interfaces;
-using MLDComputing.Emulators.BBCSim._6502.Engine;
-using MLDComputing.Emulators.BBCSim.Beeb;
 
 [TestClass]
-public class AdvancedTests
+public class AdvancedTests : TestBase
 {
-    private Assembler _assembler;
-
-    private Mapper _mapper;
-
-    private MemoryMap? _memoryMap;
-
-    private Cpu6502 _processor;
-    private Tokeniser? _tokeniser;
-
-    [TestInitialize]
-    public void Init()
-    {
-        _tokeniser = new Tokeniser();
-
-        _memoryMap = new MemoryMap();
-
-        _mapper = new Mapper();
-
-        _processor = new Cpu6502(_memoryMap!.ReadByte, _memoryMap.WriteByte);
-        _processor.Initialise(1_000_000, 50);
-        _assembler = new Assembler(_memoryMap.WriteByte);
-    }
-
     [TestMethod]
     public void Can_Set_A_Block_Of_Memory()
     {
         // Arrange 
-
         var program = @"
         LDA #0
         STA 20
@@ -44,7 +16,7 @@ public class AdvancedTests
         STA 21
         LDX #10
         JSR CLRMEM:
-        KIL
+        BRK
         CLRMEM:
         LDA#255
         LDY #0
@@ -56,21 +28,15 @@ public class AdvancedTests
         RTS
         ";
 
-        var operations = _tokeniser!.Parse(program);
-
-        _mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x1000);
-
         // Act
-        _processor.Run(3000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap.ReadByte(2560).Should().Be(0xFF);
-        _memoryMap.ReadByte(2561).Should().Be(0xFF);
-        _memoryMap.ReadByte(2562).Should().Be(0xFF);
-        _memoryMap.ReadByte(2563).Should().Be(0xFF);
-        _memoryMap.ReadByte(2570).Should().Be(0x00);
+        MemoryMap!.ReadByte(2560).Should().Be(0xFF);
+        MemoryMap.ReadByte(2561).Should().Be(0xFF);
+        MemoryMap.ReadByte(2562).Should().Be(0xFF);
+        MemoryMap.ReadByte(2563).Should().Be(0xFF);
+        MemoryMap.ReadByte(2570).Should().Be(0x00);
     }
 
     [TestMethod]
@@ -125,24 +91,13 @@ public class AdvancedTests
             LDX #$22
             LDX $08A1,Y
             STA $0200,X 
-            KIL";
-
-        var operations = _tokeniser!.Parse(program);
-        _mapper.MapAndValidate(operations);
-
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+            BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x022A).Should().Be(0x55);
+        MemoryMap!.ReadByte(0x022A).Should().Be(0x55);
     }
 
     [TestMethod]
@@ -260,25 +215,13 @@ public class AdvancedTests
 	ORA ($42),Y
 	EOR ($44),Y
 	STA $A9 
-    KIL";
-
-        var operations = _tokeniser.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+    BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0xA9).Should().Be(0xAA);
+        MemoryMap!.ReadByte(0xA9).Should().Be(0xAA);
     }
 
     [TestMethod]
@@ -320,26 +263,13 @@ public class AdvancedTests
         STA $70,X
         DEC $71
         DEC $71 
-    KIL";
-
-        ITokeniser tokeniser = new Tokeniser();
-        var operations = tokeniser.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+    BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x71).Should().Be(0xFF);
+        MemoryMap!.ReadByte(0x71).Should().Be(0xFF);
     }
 
     [TestMethod]
@@ -405,25 +335,13 @@ public class AdvancedTests
     	ROL $0100,X
     	ROR $0100,X
     	ROR $0100,X 
-        KIL";
-
-        var operations = _tokeniser!.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+        BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x01DD).Should().Be(0x6E);
+        MemoryMap!.ReadByte(0x01DD).Should().Be(0x6E);
     }
 
     [TestMethod]
@@ -444,7 +362,7 @@ public class AdvancedTests
     	        ORA #$30
     	        JSR subr:
     	        ORA #$42
-    	        JMP ($0020)
+    	        JMP final:
     	        ORA #$FF
             subr:
  	        STA $30
@@ -453,25 +371,13 @@ public class AdvancedTests
  	        RTS
          final:
  	        STA $0D,X 
-            KIL";
-
-        var operations = _tokeniser.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+            BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x40).Should().Be(0x42);
+        MemoryMap!.ReadByte(0x40).Should().Be(0x42);
     }
 
     [TestMethod]
@@ -497,24 +403,13 @@ public class AdvancedTests
               TSX
               TXA
               STA $40 
-              KIL";
-
-        var operations = _tokeniser!.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+              BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x40).Should().Be(0x33);
+        MemoryMap!.ReadByte(0x40).Should().Be(0x33);
     }
 
     [TestMethod]
@@ -522,7 +417,7 @@ public class AdvancedTests
     {
         // Arrange
         const string program = @"
-            LDA #$6A
+              LDA #$6A
         	STA $50
         	LDA #$6B
         	STA $51
@@ -586,29 +481,18 @@ public class AdvancedTests
             STA $82
             LDA #$00
         	STA $83
+            NOP
             LDA #$AA
         	ADC ($80),Y
         	SBC ($82),Y
         	STA $30 
-                KIL";
-
-        var operations = _tokeniser!.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+            BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x30).Should().Be(0x9D);
+        MemoryMap!.ReadByte(0x30).Should().Be(0x9D);
     }
 
     [TestMethod]
@@ -683,25 +567,13 @@ NOP
  	LDA $44
  	STA $15
  bne4: 
-   KIL";
-
-        var operations = _tokeniser.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+   BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x15).Should().Be(0x7F);
+        MemoryMap!.ReadByte(0x15).Should().Be(0x7F);
     }
 
     [TestMethod]
@@ -756,25 +628,12 @@ b8:
  	BNE b9:
 	STA $42	
  b9: 
-KIL";
-
-        var operations = _tokeniser!.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
-
+BRK";
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x42).Should().Be(0xA5);
+        MemoryMap!.ReadByte(0x42).Should().Be(0xA5);
     }
 
     [TestMethod]
@@ -841,25 +700,13 @@ bvc2:
 	LDA #$00 
 bcs2:
  	STA $73,X 
- KIL";
-
-        var operations = _tokeniser.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+ BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x80).Should().Be(0x1F);
+        MemoryMap!.ReadByte(0x80).Should().Be(0x1F);
     }
 
     [TestMethod]
@@ -887,25 +734,13 @@ bcs2:
         	ADC #$AD
         	NOP
         	STA $30 
-             KIL";
-
-        var operations = _tokeniser!.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
+             BRK";
 
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x30).Should().Be(0xCE);
+        MemoryMap!.ReadByte(0x30).Should().Be(0xCE);
     }
 
     [TestMethod]
@@ -925,34 +760,21 @@ bcs2:
         	LDA #$00
         	PLA
         	STA $30 
-             KIL";
-
-        var operations = _tokeniser.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x4000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
-
+             BRK";
         // Act
-        _processor.Run(0x4000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _memoryMap!.ReadByte(0x30).Should().Be(0x29);
+        MemoryMap!.ReadByte(0x30).Should().Be(0x29);
     }
 
     [TestMethod]
     public void Can_Do_8bit_Mult()
     {
         // Arrange
-        const string program = @".VAR  num1=$C000 ;comment
-            .VAR num2=$C010
-            .VAR num1Hi = $C020
+        const string program = @".VAR  num1=$0200 ;comment
+            .VAR num2=$0202
+            .VAR num1Hi = $0204
             lda#100
             sta num1
             lda#10
@@ -976,60 +798,41 @@ bcs2:
             lsr num2
             bcs doAdd:
             bne loop:
-            KIL
+            BRK
             ";
 
-        var operations = _tokeniser!.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-        _assembler.Assemble(operations, 0x2000);
-
-        foreach (var operation in operations)
-        {
-            Assert.IsTrue(string.IsNullOrWhiteSpace(operation.ErrorMessage));
-        }
-
         // Act
-        _processor.Run(0x2000, false);
+        AssembleAndRun(program);
 
         // Assert
-        Assert.AreEqual(232, _processor.Accumulator);
-        Assert.AreEqual(232, _processor.IX);
-        Assert.AreEqual(3, _processor.IY);
+        Processor!.Accumulator.Should().Be(232);
+        Processor!.IX.Should().Be(232);
+        Processor!.IY.Should().Be(3);
     }
 
     [TestMethod]
     public void Can_Multiply_By_2x10()
     {
         // Arrange 
-        var program = "LDA#2" + Environment.NewLine;
-        program += "JSR MULT10:" + Environment.NewLine;
-        program += "KIL" + Environment.NewLine;
-        program += "MULT10:" + Environment.NewLine;
-        program += "ASL A" + Environment.NewLine;
-        program += "STA TEMP:" + Environment.NewLine;
-        program += "ASL A" + Environment.NewLine;
-        program += "ASL A" + Environment.NewLine;
-        program += "CLC" + Environment.NewLine;
-        program += "ADC TEMP:" + Environment.NewLine;
-        program += "RTS" + Environment.NewLine;
-        program += "TEMP:" + Environment.NewLine;
-        program += ".byte 0" + Environment.NewLine;
-
-        var operations = _tokeniser.Parse(program);
-
-        IMapper mapper = new Mapper();
-        mapper.MapAndValidate(operations);
-
-
-        _assembler.Assemble(operations, 3000);
+        const string program = @"LDA#2
+            JSR MULT10:
+            BRK
+            MULT10:
+            ASL A
+            STA TEMP:
+            ASL A
+            ASL A
+            CLC
+            ADC TEMP:
+            RTS
+            TEMP:
+            .byte 0
+            ";
 
         // Act
-        _processor.Run(3000, false);
+        AssembleAndRun(program);
 
         // Assert
-        _processor.Accumulator.Should().Be(20);
+        Processor!.Accumulator.Should().Be(20);
     }
 }

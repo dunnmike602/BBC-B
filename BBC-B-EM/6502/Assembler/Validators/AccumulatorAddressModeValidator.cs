@@ -2,11 +2,12 @@ namespace MLDComputing.Emulators.BBCSim._6502.Assembler.Validators;
 
 public class AccumulatorAddressModeValidator : AddressModeValidator
 {
-    public const string? AccumatorAddressIdentifier = "A";
+    public const string? AccumlatorAddressIdentifier = "A";
 
     public override void Validate(Operation operation)
     {
-        if (operation.Argument == AccumatorAddressIdentifier)
+        if (operation.Argument == AccumlatorAddressIdentifier ||
+            (!operation.Definition!.AccumulatorParameterRequired && !operation.HasArguments()))
         {
             operation.HasBeenValidated = true;
 

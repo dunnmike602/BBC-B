@@ -15,7 +15,12 @@ public class OperationDefinition
     }
 
     public string? Mnemonic { get; set; }
+
     public string? Description { get; set; }
+
     public Instruction[] Instructions { get; set; }
+
     public string? Sample { get; set; }
+
+    public bool AccumulatorParameterRequired { get; set; } = true;
 }

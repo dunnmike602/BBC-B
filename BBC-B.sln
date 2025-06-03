@@ -5,6 +5,10 @@ VisualStudioVersion = 17.13.36105.23
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BBC-B", "BBC-B-EM\BBC-B.csproj", "{FA4E720B-2581-564D-C0FE-D92511191A62}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BBC-B-Tests", "BBC-B-Tests\BBC-B-Tests.csproj", "{2ADF3E40-915F-C469-4D7A-E44E31A3D126}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BeebBox", "BBC-B-UI\BeebBox.csproj", "{A9972735-D0AE-AB43-978C-D111344EE0D4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{FA4E720B-2581-564D-C0FE-D92511191A62}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FA4E720B-2581-564D-C0FE-D92511191A62}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FA4E720B-2581-564D-C0FE-D92511191A62}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2ADF3E40-915F-C469-4D7A-E44E31A3D126}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2ADF3E40-915F-C469-4D7A-E44E31A3D126}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2ADF3E40-915F-C469-4D7A-E44E31A3D126}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2ADF3E40-915F-C469-4D7A-E44E31A3D126}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9972735-D0AE-AB43-978C-D111344EE0D4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9972735-D0AE-AB43-978C-D111344EE0D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9972735-D0AE-AB43-978C-D111344EE0D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9972735-D0AE-AB43-978C-D111344EE0D4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
