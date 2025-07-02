@@ -50,6 +50,13 @@ public static class Helper
             [0xbfc4] = (0xbfce, "BASIC - Missing messages"),
             [0xbff9] = (0xbfff, "BASIC - Rogers Wilson messages"),
 
+
+            [0x0000] = (0x00ff, "OS - Zero Page"),
+            [0x0100] = (0x01ff, "OS - Page 1 - Stack"),
+            [0x0200] = (0x02ff, "OS - Page 2 - OS Workspace – System flags, pointers, handlers"),
+            [0x0300] = (0x03ff, "OS - Page 3 - OS Workspace – File buffers, VDU drivers"),
+            [0x0400] = (0x04ff, "OS - Page 3 - OS Workspace – More System variables"),
+            [0x0500] = (0x05ff, "OS - Page 3 - OS Workspace – OS Workspace and user application variables"),
             [0xC000] = (0xC2ff, "OS - Character Definitions"),
             [0xC302] = (0xC4BF, "OS - VDU Tables"),
             [0xD940] = (0xD975, "OS - Default Vector Table"),

@@ -9,19 +9,24 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using BBCSim._6502.Disassembler;
+using BBCSim._6502.Engine;
 using BBCSim._6502.Engine.Communication;
 using BBCSim._6502.Extensions;
 using BBCSim._6502.Storage;
 using BBCSim.Beeb;
+using BBCSim.Beeb.Hardware;
+using BBCSim.Mapper;
 using Domain;
 using Extensions;
 using Byte = BBCSim._6502.Storage.Byte;
@@ -32,6 +37,9 @@ public partial class MainWindow : INotifyPropertyChanged
     private const int Rows = 25;
     private const double CharWidth = 16; // adjust to your font’s cell width
     private const double CharHeight = 20; // adjust to your font’s cell height
+
+    private const int WM_KEYDOWN = 0x0100;
+    private const int WM_KEYUP = 0x0101;
 
     private readonly AutoResetEvent _event = new(false);
 
@@ -46,7 +54,10 @@ public partial class MainWindow : INotifyPropertyChanged
     private ObservableCollection<Instruction> _disassembly;
 
     private long _instructionCount;
+
+    private KeyMapper _keyMapper;
     private DispatcherTimer _renderTimer;
+    private HwndSource _source;
 
     private ObservableCollection<MemoryByte> _stackDisassembly;
 
@@ -71,6 +82,8 @@ public partial class MainWindow : INotifyPropertyChanged
         DissassembleAll();
 
         ProcessRegisters();
+
+        SetupKeyMap();
 
         _max = Slider.Maximum;
     }
@@ -153,6 +166,12 @@ public partial class MainWindow : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler PropertyChanged;
 
+    private void SetupKeyMap()
+    {
+        _keyMapper = new KeyMapper();
+        _keyMapper.InitKeyMaps();
+    }
+
     private void SetupTeletextDisplay()
     {
         // Load the Teletext font
@@ -166,9 +185,11 @@ public partial class MainWindow : INotifyPropertyChanged
 
         _renderTimer.Tick += (_, _) =>
         {
+            ProcessRegisters();
             RenderTeletextScreen(_vm.Memory.GetVideoBuffer());
             UpdateMachineAttributes();
         };
+
         _renderTimer.Start();
     }
 
@@ -339,19 +360,69 @@ public partial class MainWindow : INotifyPropertyChanged
     {
         var cpu = _vm.CPU;
 
-        ACC.Text = cpu.Accumulator.ToString("X2") + " h";
+        Process6502Registers(cpu);
+
+        var main6522 = _vm.Via6522;
+
+        Process6522Registers(_vm.Via6522);
+    }
+
+    private void Process6522Registers(Via6522 via)
+    {
+        ACR.Text = "0x" + via.ACR.ToString("X2");
+        ACRD.Text = via.ACR.ToString();
+        ACRB.Text = "b" + Convert.ToString(via.ACR, 2).PadLeft(8, '0');
+
+        DDRA.Text = "0x" + via.DDRA.ToString("X2");
+        DDRAD.Text = via.DDRA.ToString();
+        DDRAB.Text = "b" + Convert.ToString(via.DDRA, 2).PadLeft(8, '0');
+
+        DDRB.Text = "0x" + via.DDRB.ToString("X2");
+        DDRBD.Text = via.DDRB.ToString();
+        DDRBB.Text = "b" + Convert.ToString(via.DDRB, 2).PadLeft(8, '0');
+
+        IER.Text = "0x" + via.IER.ToString("X2");
+        IERD.Text = via.IER.ToString();
+        IERB.Text = "b" + Convert.ToString(via.IER, 2).PadLeft(8, '0');
+
+        IFR.Text = "0x" + via.IFR.ToString("X2");
+        IFRD.Text = via.IFR.ToString();
+        IFRB.Text = "b" + Convert.ToString(via.IFR, 2).PadLeft(8, '0');
+
+        ORA.Text = "0x" + via.ORA.ToString("X2");
+        ORAD.Text = via.ORA.ToString();
+        ORAB.Text = "b" + Convert.ToString(via.ORA, 2).PadLeft(8, '0');
+
+        ORB.Text = "0x" + via.ORB.ToString("X2");
+        ORBD.Text = via.ORB.ToString();
+        ORBB.Text = "b" + Convert.ToString(via.ORB, 2).PadLeft(8, '0');
+
+        PCR.Text = "0x" + via.PCR.ToString("X2");
+        PCRD.Text = via.PCR.ToString();
+        PCRB.Text = "b" + Convert.ToString(via.PCR, 2).PadLeft(8, '0');
+    }
+
+    private void Process6502Registers(Cpu6502 cpu)
+    {
+        ACC.Text = "0x" + cpu.Accumulator.ToString("X2");
         ACCD.Text = cpu.Accumulator.ToString();
+        ACCB.Text = "b" + Convert.ToString(cpu.Accumulator, 2).PadLeft(8, '0');
 
-        PC.Text = cpu.ProgramCounter.ToString("X4") + " h";
+        PC.Text = "0x" + cpu.ProgramCounter.ToString("X4");
         PCD.Text = cpu.ProgramCounter.ToString();
+        PCB.Text = "b" + Convert.ToString(cpu.ProgramCounter, 2).PadLeft(16, '0');
 
-        IX.Text = cpu.IX.ToString("X2") + " h";
+        IX.Text = "0x" + cpu.IX.ToString("X2");
         IXD.Text = cpu.IX.ToString();
-        IY.Text = cpu.IY.ToString("X2") + " h";
-        IYD.Text = cpu.IY.ToString();
+        IXB.Text = "b" + Convert.ToString(cpu.IX, 2).PadLeft(8, '0');
 
-        SP.Text = cpu.StackPointer.ToString("X2") + " h";
+        IY.Text = "0x" + cpu.IY.ToString("X2");
+        IYD.Text = cpu.IY.ToString();
+        IYB.Text = "b" + Convert.ToString(cpu.IY, 2).PadLeft(8, '0');
+
+        SP.Text = "0x" + cpu.StackPointer.ToString("X2");
         SPD.Text = cpu.StackPointer.ToString();
+        SPB.Text = "b" + Convert.ToString(cpu.StackPointer, 2).PadLeft(8, '0');
 
         StatusN.Text = cpu.Status.GetBit((Byte)Statuses.Negative) == Bit.One ? "1" : "0";
         StatusV.Text = cpu.Status.GetBit((Byte)Statuses.Overflow) == Bit.One ? "1" : "0";
@@ -364,31 +435,45 @@ public partial class MainWindow : INotifyPropertyChanged
 
     private void MainWindow_KeyUp(object sender, KeyEventArgs e)
     {
-        if (_vm.Keyboard.TryMapKey((int)e.Key, out var pos))
-        {
-            _vm.Keyboard.SetKeyState(pos.Row, pos.Column, false);
-            e.Handled = true;
+        return;
+        var focusedElement = Keyboard.FocusedElement as FrameworkElement;
 
-            TrickOsIntoThinkingAKeyHasBeenPressed();
+        if (focusedElement!.GetType() != typeof(ScrollViewer))
+        {
+            return;
         }
+
+        var keyCode = KeyInterop.VirtualKeyFromKey(e.Key);
+        var shiftHeld = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
+
+        var mapping = _keyMapper.ProcessKeyPress(keyCode, shiftHeld, false); // Key up
+
+        _vm.SystemVia.KeyUp(mapping.Row, mapping.Column);
+        e.Handled = true;
     }
 
     private void MainWindow_KeyDown(object sender, KeyEventArgs e)
     {
-        if (_vm.Keyboard.TryMapKey((int)e.Key, out var pos))
+        return;
+        var focusedElement = Keyboard.FocusedElement as FrameworkElement;
+
+        if (focusedElement!.GetType() != typeof(ScrollViewer))
         {
-            _vm.Keyboard.SetKeyState(pos.Row, pos.Column, true);
-            e.Handled = true;
-
-            TrickOsIntoThinkingAKeyHasBeenPressed();
+            return;
         }
-    }
 
-    private void TrickOsIntoThinkingAKeyHasBeenPressed()
-    {
-        // Notify OS that a key is logically "active"
-        _vm.Memory.WriteByte(0x00EC, 0x01); // or ED
-        _vm.Memory.WriteByte(0x0242, 0xFF); // Ensure scanning is enabled
+        var keyCode = KeyInterop.VirtualKeyFromKey(e.Key);
+        var shiftHeld = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
+
+        var mapping = _keyMapper.ProcessKeyPress(keyCode, shiftHeld, false); // Key up
+
+        KeyPress.Text =
+            $"Last Key Windows={e.Key} BBC Row={mapping.Row} BBC Column={mapping.Column}, Shift={mapping.RequiresShift}";
+
+        LogScreen.Text += KeyPress.Text + Environment.NewLine;
+
+        _vm.SystemVia.KeyDown(mapping.Row, mapping.Column);
+        e.Handled = true;
     }
 
     protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
@@ -398,7 +483,7 @@ public partial class MainWindow : INotifyPropertyChanged
 
     private void MenuItem_OnClick(object sender, RoutedEventArgs e)
     {
-        ErrorScreen.Text = string.Empty;
+        LogScreen.Text = string.Empty;
     }
 
     private void Slider_OnValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -421,12 +506,11 @@ public partial class MainWindow : INotifyPropertyChanged
     {
         IsStarted = false;
 
-        //   _vm.OnUpdateDisplay += UpdateDisplay;
-        _vm.Keyboard.CapsLockChanged -= KeyboardCapsLockChanged;
+        _vm.LightChanged -= KeyboardLightChanged;
         _vm.CPU.Execute -= CPUBeforeExecute;
         _vm.CPU.ProcessorError -= CPUProcessorError;
 
-        _vm.Keyboard.CapsLockChanged += KeyboardCapsLockChanged;
+        _vm.LightChanged += KeyboardLightChanged;
         _vm.CPU.Execute += CPUBeforeExecute;
         _vm.CPU.ProcessorError += CPUProcessorError;
 
@@ -438,23 +522,33 @@ public partial class MainWindow : INotifyPropertyChanged
         IsStarted = true;
     }
 
-
-    private void KeyboardCapsLockChanged(object sender, CapsChangedLockEventArgs e)
+    private void KeyboardLightChanged(object sender, LightChangedEventArgs e)
     {
-        Dispatcher.Invoke(() => { CapsLock.IsOn = e.IsOn; });
+        Dispatcher.Invoke(() =>
+        {
+            switch (e.Type)
+            {
+                case LEDType.CapsLock:
+                    CapsLock.IsOn = e.IsOn;
+                    return;
+                case LEDType.ShiftLock:
+                    ShiftLock.IsOn = e.IsOn;
+                    return;
+            }
+        });
     }
 
     private void CPUProcessorError(object sender, ProcessorErrorEventArgs e)
     {
         Dispatcher.Invoke(() =>
         {
-            ErrorScreen.Text +=
+            LogScreen.Text +=
                 "=========Exception thrown by VM=============================" + Environment.NewLine;
-            ErrorScreen.Text += e.ErrorMessage + Environment.NewLine;
-            ErrorScreen.Text += $"Instruction: {e.Instruction.Code}" + Environment.NewLine;
-            ErrorScreen.Text += "Registers: " + Environment.NewLine;
-            ErrorScreen.Text += $"{e.Registers}" + Environment.NewLine;
-            ErrorScreen.Text +=
+            LogScreen.Text += e.ErrorMessage + Environment.NewLine;
+            LogScreen.Text += $"Instruction: {e.Instruction.Code}" + Environment.NewLine;
+            LogScreen.Text += "Registers: " + Environment.NewLine;
+            LogScreen.Text += $"{e.Registers}" + Environment.NewLine;
+            LogScreen.Text +=
                 "=========End Exception thrown by VM=========================" + Environment.NewLine;
         });
     }
@@ -499,6 +593,14 @@ public partial class MainWindow : INotifyPropertyChanged
 
         Dispatcher.Invoke(() =>
         {
+            if (_vm.CPU.EnableLogging)
+            {
+                foreach (var line in e.InstructionText)
+                {
+                    LogScreen.Text += line + Environment.NewLine;
+                }
+            }
+
             if (!(_value > 0))
             {
                 return;
@@ -635,5 +737,55 @@ public partial class MainWindow : INotifyPropertyChanged
     private void EnableProcessorEvents_OnChecked(object sender, RoutedEventArgs e)
     {
         _vm.CPU.EnableProcessorEvents = EnableProcessorEvents.IsChecked!.Value;
+    }
+
+    private void MainWindow_OnDeactivated(object sender, EventArgs e)
+    {
+        _vm.SystemVia.ReleaseAllKeys();
+    }
+
+    private void EnableLogging_OnChecked(object sender, RoutedEventArgs e)
+    {
+        _vm.CPU.EnableLogging = EnableLogging.IsChecked!.Value;
+    }
+
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        _source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+        _source.AddHook(WndProc); // Hook raw Win32 messages
+    }
+
+    [DllImport("user32.dll")]
+    private static extern short GetKeyState(int nVirtKey);
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_KEYDOWN || msg == WM_KEYUP)
+        {
+            var keyCode = wParam.ToInt32();
+
+            var shiftHeld = (GetKeyState((int)Key.LeftShift) & 0x8000) != 0 ||
+                            (GetKeyState((int)Key.RightShift) & 0x8000) != 0;
+
+            var isKeyUp = msg == WM_KEYUP;
+
+            var mapping = _keyMapper.ProcessKeyPress(keyCode, shiftHeld, isKeyUp);
+
+            // Now use mapping (e.g., call KeyDown/KeyUp on the emulator)
+            if (!isKeyUp && mapping is { } down)
+            {
+                _vm.SystemVia.KeyDown(down.Row, down.Column);
+            }
+            else if (isKeyUp && mapping is { } up)
+            {
+                _vm.SystemVia.KeyUp(up.Row, up.Column);
+            }
+
+            handled = true;
+        }
+
+        return IntPtr.Zero;
     }
 }

@@ -85,7 +85,7 @@ public class Assembler(Action<ushort, byte> writeByte) : IAssembler
             if (operation.IsAddressPseudoOperation)
             {
                 programCounter = (ushort)(operation.Parameters[0] + operation.Parameters[1] *
-                    ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    MachineConstants.ProcessorSetup.MsbMultiplier);
                 operation.MemoryAddress = programCounter;
                 continue;
             }
@@ -134,7 +134,7 @@ public class Assembler(Action<ushort, byte> writeByte) : IAssembler
             if (variableOp != null)
             {
                 var variableValue = variableOp.Parameters[0] +
-                                    variableOp.Parameters[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier +
+                                    variableOp.Parameters[1] * MachineConstants.ProcessorSetup.MsbMultiplier +
                                     GetOffset(innerOperation.VariableName);
 
                 // Pick Hi or Lo byte if appropriate
@@ -219,15 +219,15 @@ public class Assembler(Action<ushort, byte> writeByte) : IAssembler
             case AddressingModes.Relative:
                 var offset = labelTarget.MemoryAddress - (operation.MemoryAddress + 2);
 
-                if (offset < ProcessorConstants.ProcessorSetup.RelativeAddressBackwardsLimit ||
-                    offset > ProcessorConstants.ProcessorSetup.RelativeAddressForwardsLimit)
+                if (offset < MachineConstants.ProcessorSetup.RelativeAddressBackwardsLimit ||
+                    offset > MachineConstants.ProcessorSetup.RelativeAddressForwardsLimit)
                 {
                     operation.ErrorMessage = offset + " is an invalid relative address target.";
                     return false;
                 }
 
                 writeByte(startLocation, offset <= 0
-                    ? (byte)(offset - ProcessorConstants.ProcessorSetup.ProgramCounterOffset)
+                    ? (byte)(offset - MachineConstants.ProcessorSetup.ProgramCounterOffset)
                     : (byte)offset);
                 break;
 

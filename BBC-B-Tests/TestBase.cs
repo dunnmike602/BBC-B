@@ -21,7 +21,7 @@ public abstract class TestBase
         MemoryMap = new TestMemoryMap();
         Mapper = new Mapper();
         Processor = new Cpu6502(MemoryMap.ReadByte, MemoryMap.WriteByte);
-        Processor!.InitialiseSlim(1_000_000, 50, StartAddress, true);
+        Processor!.InitialiseSlim(10_000_000, 50, StartAddress, true);
         Assembler = new Assembler(MemoryMap.WriteByte);
     }
 

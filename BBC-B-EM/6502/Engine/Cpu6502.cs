@@ -5,6 +5,8 @@ using System.Runtime.CompilerServices;
 using Assembler;
 using Communication;
 using Constants;
+using Disassembler;
+using Disassembler.Interfaces;
 using Enums;
 using Exceptions;
 using Extensions;
@@ -18,6 +20,8 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
     private Instruction[]? _instructions;
 
     public int CyclesPerSecond;
+
+    public bool EnableLogging = false;
 
     public bool EnableProcessorEvents;
 
@@ -85,6 +89,8 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
         ResetProcessor();
 
         IsRunning = true;
+
+        _dis = Disassembler.Build();
     }
 
     /// <summary>
@@ -116,8 +122,8 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void InitProgramCounter()
     {
-        ProgramCounter = (ushort)(readByte(ProcessorConstants.ProcessorSetup.ResetVectorLow) |
-                                  (readByte(ProcessorConstants.ProcessorSetup.ResetVectorHigh) << 8));
+        ProgramCounter = (ushort)(readByte(MachineConstants.ProcessorSetup.ResetVectorLow) |
+                                  (readByte(MachineConstants.ProcessorSetup.ResetVectorHigh) << 8));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -171,7 +177,8 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
     {
         if (Status.GetBit((Byte)Statuses.InterruptDisable) == Bit.One)
         {
-            // IRQs are masked (disabled), so ignore it
+            // IRQs are masked (di
+            // sabled), so ignore it
             return;
         }
 
@@ -215,21 +222,31 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
         if (EnableProcessorEvents)
         {
-            Execute?.Invoke(this,
-                new ExecuteEventArgs
+            var executeEventArgs = new ExecuteEventArgs
+            {
+                Address = ProgramCounter,
+                Instruction = instruction,
+                Registers = new Registers
                 {
-                    Address = ProgramCounter,
-                    Instruction = instruction,
-                    Registers = new Registers
-                    {
-                        Accumulator = Accumulator,
-                        IX = IX,
-                        IY = IY,
-                        ProgramCounter = ProgramCounter,
-                        StackPointer = StackPointer,
-                        Status = Status
-                    }
-                });
+                    Accumulator = Accumulator,
+                    IX = IX,
+                    IY = IY,
+                    ProgramCounter = ProgramCounter,
+                    StackPointer = StackPointer,
+                    Status = Status
+                }
+            };
+
+            if (EnableLogging)
+            {
+                var line = _dis.Disassemble(readByte, ProgramCounter, (ushort)(ProgramCounter + instruction.Bytes), 16)
+                    .Select(op => op.MemoryAddress.ToString("X4") + " " + op.Definition?.Mnemonic + " " + op.Argument);
+
+                executeEventArgs.InstructionText = line;
+            }
+
+            Execute?.Invoke(this,
+                executeEventArgs);
         }
 
         InstructionCount++;
@@ -511,6 +528,8 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
     private bool _irqPending;
 
+    private IDisassembler _dis;
+
     #endregion
 
     #region Execution code for each 6502 instruction keeping this inline for the moment for performance
@@ -541,21 +560,21 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.SBCAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 operand = readByte(absoluteAddress);
                 break;
 
             case (byte)OpCodeValues.SBCAbsoluteX:
                 var absoluteAddressX = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 operand = readByte(absoluteAddressX);
                 break;
 
             case (byte)OpCodeValues.SBCAbsoluteY:
                 var absoluteAddressY = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 operand = readByte(absoluteAddressY);
                 break;
 
@@ -564,7 +583,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
                 var zeroPageLsbX = readByte(zeroPageIndexX);
                 var zeroPageMsbX = readByte((byte)(zeroPageIndexX + 1));
                 var zeroPageAddressIndexedX =
-                    (ushort)(zeroPageLsbX + zeroPageMsbX * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)(zeroPageLsbX + zeroPageMsbX * MachineConstants.ProcessorSetup.MsbMultiplier);
                 operand = readByte(zeroPageAddressIndexedX);
                 ProgramCounter++;
                 break;
@@ -573,10 +592,10 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
                 var zeroPageIndexY = readByte(ProgramCounter);
                 var zeroPageLsbY = readByte(zeroPageIndexY);
                 var zeroPageMsbY =
-                    readByte((ushort)((zeroPageIndexY + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexY + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
 
                 var zeroPageAddressIndexY =
-                    (ushort)(zeroPageLsbY + zeroPageMsbY * ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                    (ushort)(zeroPageLsbY + zeroPageMsbY * MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 operand = readByte(zeroPageAddressIndexY);
                 ProgramCounter++;
                 break;
@@ -673,21 +692,21 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.ADCAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 operand = readByte(absoluteAddress);
                 break;
 
             case (byte)OpCodeValues.ADCAbsoluteX:
                 var absoluteAddressX = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 operand = readByte(absoluteAddressX);
                 break;
 
             case (byte)OpCodeValues.ADCAbsoluteY:
                 var absoluteAddressY = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 operand = readByte(absoluteAddressY);
                 break;
 
@@ -705,10 +724,10 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
                 var zeroPageIndexY = readByte(ProgramCounter);
                 var zeroPageLsbY = readByte(zeroPageIndexY);
                 var zeroPageMsbY =
-                    readByte((ushort)((zeroPageIndexY + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexY + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
 
                 var zeroPageAddressIndexY =
-                    (ushort)(zeroPageLsbY + zeroPageMsbY * ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                    (ushort)(zeroPageLsbY + zeroPageMsbY * MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 operand = readByte(zeroPageAddressIndexY);
                 ProgramCounter++;
                 break;
@@ -788,15 +807,15 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
         {
             case (byte)OpCodeValues.JMPAbsolute:
                 memoryValue = (ushort)(readByte(ProgramCounter++) +
-                                       readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                       readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier);
                 break;
 
             case (byte)OpCodeValues.JMPIndirect:
                 memoryValue = (ushort)(readByte(ProgramCounter++) +
-                                       readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                       readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier);
                 memoryValue = (ushort)(readByte(memoryValue) +
                                        readByte((ushort)(memoryValue + 1)) *
-                                       ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                       MachineConstants.ProcessorSetup.MsbMultiplier);
                 break;
         }
 
@@ -878,8 +897,8 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
         Status = Status.SetBit((Byte)Statuses.InterruptDisable, Bit.One);
 
         // Read BRK/IRQ vector 
-        var low = readByte(ProcessorConstants.ProcessorSetup.IrqHandlerLowByte);
-        var high = readByte(ProcessorConstants.ProcessorSetup.IrqHandlerHighByte);
+        var low = readByte(MachineConstants.ProcessorSetup.IrqHandlerLowByte);
+        var high = readByte(MachineConstants.ProcessorSetup.IrqHandlerHighByte);
         ProgramCounter = (ushort)((high << 8) | low);
 
         return null;
@@ -887,7 +906,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
     public ushort GetStackAddress()
     {
-        var address = ProcessorConstants.ProcessorSetup.StackBase + StackPointer;
+        var address = MachineConstants.ProcessorSetup.StackBase + StackPointer;
 
         return (ushort)address;
     }
@@ -911,7 +930,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte PeekStack(byte stackPointer)
     {
-        var value = readByte((ushort)(ProcessorConstants.ProcessorSetup.StackBase + stackPointer));
+        var value = readByte((ushort)(MachineConstants.ProcessorSetup.StackBase + stackPointer));
 
         return value;
     }
@@ -942,32 +961,32 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.CMPAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 memoryValue = readByte(absoluteAddress);
                 break;
 
             case (byte)OpCodeValues.CMPAbsoluteX:
                 var absoluteAddressX = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 memoryValue = readByte(absoluteAddressX);
                 break;
 
             case (byte)OpCodeValues.CMPAbsoluteY:
                 var absoluteAddressY = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 memoryValue = readByte(absoluteAddressY);
                 break;
 
             case (byte)OpCodeValues.CMPIndexedIndirect:
                 var zeroPageIndexX =
-                    (ushort)((readByte(ProgramCounter) + IX) % ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)((readByte(ProgramCounter) + IX) % MachineConstants.ProcessorSetup.MsbMultiplier);
                 var zeroPageLsbX = readByte(zeroPageIndexX);
                 var zeroPageMsbX =
-                    readByte((ushort)((zeroPageIndexX + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexX + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
                 var zeroPageAddressIndexedX =
-                    (ushort)(zeroPageLsbX + zeroPageMsbX * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)(zeroPageLsbX + zeroPageMsbX * MachineConstants.ProcessorSetup.MsbMultiplier);
 
                 memoryValue = readByte(zeroPageAddressIndexedX);
                 ProgramCounter++;
@@ -977,10 +996,10 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
                 var zeroPageIndexY = readByte(ProgramCounter);
                 var zeroPageLsbY = readByte(zeroPageIndexY);
                 var zeroPageMsbY =
-                    readByte((ushort)((zeroPageIndexY + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexY + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
 
                 var zeroPageAddressIndexY =
-                    (ushort)(zeroPageLsbY + zeroPageMsbY * ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                    (ushort)(zeroPageLsbY + zeroPageMsbY * MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 memoryValue = readByte(zeroPageAddressIndexY);
                 ProgramCounter++;
                 break;
@@ -1027,7 +1046,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.CPXAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 memoryValue = readByte(absoluteAddress);
                 break;
         }
@@ -1091,7 +1110,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.CPYAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 memoryValue = readByte(absoluteAddress);
                 break;
         }
@@ -1241,32 +1260,32 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.EORAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 memoryValue = readByte(absoluteAddress);
                 break;
 
             case (byte)OpCodeValues.EORAbsoluteX:
                 var absoluteAddressX = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 memoryValue = readByte(absoluteAddressX);
                 break;
 
             case (byte)OpCodeValues.EORAbsoluteY:
                 var absoluteAddressY = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 memoryValue = readByte(absoluteAddressY);
                 break;
 
             case (byte)OpCodeValues.EORIndexedIndirect:
                 var zeroPageIndexX =
-                    (ushort)((readByte(ProgramCounter) + IX) % ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)((readByte(ProgramCounter) + IX) % MachineConstants.ProcessorSetup.MsbMultiplier);
                 var zeroPageLsbX = readByte(zeroPageIndexX);
                 var zeroPageMsbX = readByte((ushort)(zeroPageIndexX + 1)) %
-                                   ProcessorConstants.ProcessorSetup.MsbMultiplier;
+                                   MachineConstants.ProcessorSetup.MsbMultiplier;
                 var zeroPageAddressIndexedX =
-                    (ushort)(zeroPageLsbX + zeroPageMsbX * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)(zeroPageLsbX + zeroPageMsbX * MachineConstants.ProcessorSetup.MsbMultiplier);
 
                 memoryValue = readByte(zeroPageAddressIndexedX);
                 ProgramCounter++;
@@ -1276,10 +1295,10 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
                 var zeroPageIndexY = readByte(ProgramCounter);
                 var zeroPageLsbY = readByte(zeroPageIndexY);
                 var zeroPageMsbY = readByte((ushort)(zeroPageIndexY + 1)) %
-                                   ProcessorConstants.ProcessorSetup.MsbMultiplier;
+                                   MachineConstants.ProcessorSetup.MsbMultiplier;
 
                 var zeroPageAddressIndexY =
-                    (ushort)(zeroPageLsbY + zeroPageMsbY * ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                    (ushort)(zeroPageLsbY + zeroPageMsbY * MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 memoryValue = readByte(zeroPageAddressIndexY);
                 ProgramCounter++;
                 break;
@@ -1319,32 +1338,32 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.ANDAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 memoryValue = readByte(absoluteAddress);
                 break;
 
             case (byte)OpCodeValues.ANDAbsoluteX:
                 var absoluteAddressX = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 memoryValue = readByte(absoluteAddressX);
                 break;
 
             case (byte)OpCodeValues.ANDAbsoluteY:
                 var absoluteAddressY = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 memoryValue = readByte(absoluteAddressY);
                 break;
 
             case (byte)OpCodeValues.ANDIndexedIndirect:
                 var zeroPageIndexX =
-                    (ushort)((readByte(ProgramCounter) + IX) % ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)((readByte(ProgramCounter) + IX) % MachineConstants.ProcessorSetup.MsbMultiplier);
                 var zeroPageLsbX = readByte(zeroPageIndexX);
                 var zeroPageMsbX =
-                    readByte((ushort)((zeroPageIndexX + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexX + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
                 var zeroPageAddressIndexedX =
-                    (ushort)(zeroPageLsbX + zeroPageMsbX * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)(zeroPageLsbX + zeroPageMsbX * MachineConstants.ProcessorSetup.MsbMultiplier);
 
                 memoryValue = readByte(zeroPageAddressIndexedX);
                 ProgramCounter++;
@@ -1354,10 +1373,10 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
                 var zeroPageIndexY = readByte(ProgramCounter);
                 var zeroPageLsbY = readByte(zeroPageIndexY);
                 var zeroPageMsbY =
-                    readByte((ushort)((zeroPageIndexY + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexY + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
 
                 var zeroPageAddressIndexY =
-                    zeroPageLsbY + zeroPageMsbY * ProcessorConstants.ProcessorSetup.MsbMultiplier + IY;
+                    zeroPageLsbY + zeroPageMsbY * MachineConstants.ProcessorSetup.MsbMultiplier + IY;
                 memoryValue = readByte((ushort)zeroPageAddressIndexY);
                 ProgramCounter++;
                 break;
@@ -1442,12 +1461,12 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
             case (byte)OpCodeValues.DECAbsolute:
                 memoryLocation = (ushort)(readByte(ProgramCounter++) +
-                                          readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                          readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier);
                 break;
 
             case (byte)OpCodeValues.DECAbsoluteX:
                 memoryLocation = (ushort)(readByte(ProgramCounter++) +
-                                          readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier +
+                                          readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier +
                                           IX);
                 break;
         }
@@ -1479,12 +1498,12 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
             case (byte)OpCodeValues.INCAbsolute:
                 memoryLocation = (ushort)(readByte(ProgramCounter++) +
-                                          readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                          readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier);
                 break;
 
             case (byte)OpCodeValues.INCAbsoluteX:
                 memoryLocation = (ushort)(readByte(ProgramCounter++) +
-                                          readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier +
+                                          readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier +
                                           IX);
                 break;
         }
@@ -1542,7 +1561,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             {
                 var low = readByte(ProgramCounter++);
                 var high = readByte(ProgramCounter++);
-                var address = (ushort)(low + high * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                var address = (ushort)(low + high * MachineConstants.ProcessorSetup.MsbMultiplier);
                 var value = readByte(address);
                 msb = value.GetBit(Byte.Seven);
                 value = (byte)(value << 1);
@@ -1555,7 +1574,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             {
                 var low = readByte(ProgramCounter++);
                 var high = readByte(ProgramCounter++);
-                var address = (ushort)(low + high * ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                var address = (ushort)(low + high * MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 var value = readByte(address);
                 msb = value.GetBit(Byte.Seven);
                 value = (byte)(value << 1);
@@ -1626,7 +1645,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             {
                 var low = readByte(ProgramCounter++);
                 var high = readByte(ProgramCounter++);
-                var address = (ushort)(low + high * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                var address = (ushort)(low + high * MachineConstants.ProcessorSetup.MsbMultiplier);
                 value = readByte(address);
                 carryOut = value.GetBit(Byte.Zero);
                 var carryIn = Status.GetBit((byte)Statuses.Carry);
@@ -1641,7 +1660,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             {
                 var low = readByte(ProgramCounter++);
                 var high = readByte(ProgramCounter++);
-                var address = (ushort)(low + high * ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                var address = (ushort)(low + high * MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 value = readByte(address);
                 carryOut = value.GetBit(Byte.Zero);
                 var carryIn = Status.GetBit((byte)Statuses.Carry);
@@ -1708,7 +1727,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             {
                 var low = readByte(ProgramCounter++);
                 var high = readByte(ProgramCounter++);
-                var address = (ushort)(low + high * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                var address = (ushort)(low + high * MachineConstants.ProcessorSetup.MsbMultiplier);
                 var value = readByte(address);
                 carryOut = value.GetBit(Byte.Seven);
                 var carryIn = Status.GetBit((byte)Statuses.Carry);
@@ -1721,7 +1740,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             {
                 var low = readByte(ProgramCounter++);
                 var high = readByte(ProgramCounter++);
-                var address = (ushort)(low + high * ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                var address = (ushort)(low + high * MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 var value = readByte(address);
                 carryOut = value.GetBit(Byte.Seven);
                 var carryIn = Status.GetBit((byte)Statuses.Carry);
@@ -1779,7 +1798,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             {
                 var low = readByte(ProgramCounter);
                 var high = readByte((ushort)(ProgramCounter + 1));
-                var absoluteAddress = (ushort)(low + high * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                var absoluteAddress = (ushort)(low + high * MachineConstants.ProcessorSetup.MsbMultiplier);
                 var value = readByte(absoluteAddress);
                 lsb = value.GetBit(0);
                 finalValue = (byte)(value >> 1);
@@ -1792,7 +1811,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             {
                 var low = readByte(ProgramCounter);
                 var high = readByte((ushort)(ProgramCounter + 1));
-                var absoluteAddressX = (ushort)(low + high * ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                var absoluteAddressX = (ushort)(low + high * MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 var value = readByte(absoluteAddressX);
                 lsb = value.GetBit(0);
                 finalValue = (byte)(value >> 1);
@@ -1867,7 +1886,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
         var absoluteAddress =
             (ushort)(readByte(ProgramCounter++) +
-                     readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                     readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier);
 
         var addressToPush = (ushort)(ProgramCounter - 1);
 
@@ -1916,32 +1935,32 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
             case (byte)OpCodeValues.LDAAbsolute:
                 var absoluteAddress = readByte(ProgramCounter++) +
-                                      readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier;
+                                      readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier;
                 Accumulator = readByte((ushort)absoluteAddress);
                 break;
 
             case (byte)OpCodeValues.LDAAbsoluteX:
                 var absoluteAddressX = readByte(ProgramCounter++) +
-                                       readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier +
+                                       readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier +
                                        IX;
                 Accumulator = readByte((ushort)absoluteAddressX);
                 break;
 
             case (byte)OpCodeValues.LDAAbsoluteY:
                 var absoluteAddressY = readByte(ProgramCounter++) +
-                                       readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier +
+                                       readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier +
                                        IY;
                 Accumulator = readByte((ushort)absoluteAddressY);
                 break;
 
             case (byte)OpCodeValues.LDAIndexedIndirect:
                 var zeroPageIndexX = (ushort)(readByte(ProgramCounter) + IX) %
-                                     ProcessorConstants.ProcessorSetup.MsbMultiplier;
+                                     MachineConstants.ProcessorSetup.MsbMultiplier;
                 var zeroPageLsbX = readByte((ushort)zeroPageIndexX);
                 var zeroPageMsbX =
-                    readByte((ushort)((zeroPageIndexX + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexX + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
                 var zeroPageAddressIndexedX =
-                    zeroPageLsbX + zeroPageMsbX * ProcessorConstants.ProcessorSetup.MsbMultiplier;
+                    zeroPageLsbX + zeroPageMsbX * MachineConstants.ProcessorSetup.MsbMultiplier;
 
                 Accumulator = readByte((ushort)zeroPageAddressIndexedX);
                 ProgramCounter++;
@@ -1951,10 +1970,10 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
                 var zeroPageIndexY = readByte(ProgramCounter);
                 var zeroPageLsbY = readByte(zeroPageIndexY);
                 var zeroPageMsbY =
-                    readByte((ushort)((zeroPageIndexY + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexY + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
 
                 var zeroPageAddressIndexY =
-                    zeroPageLsbY + zeroPageMsbY * ProcessorConstants.ProcessorSetup.MsbMultiplier + IY;
+                    zeroPageLsbY + zeroPageMsbY * MachineConstants.ProcessorSetup.MsbMultiplier + IY;
                 Accumulator = readByte((ushort)zeroPageAddressIndexY);
                 ProgramCounter++;
                 break;
@@ -1986,32 +2005,32 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.STAAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 writeByte(absoluteAddress, Accumulator);
                 break;
 
             case (byte)OpCodeValues.STAAbsoluteX:
                 var absoluteAddressX = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 writeByte(absoluteAddressX, Accumulator);
                 break;
 
             case (byte)OpCodeValues.STAAbsoluteY:
                 var absoluteAddressY = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 writeByte(absoluteAddressY, Accumulator);
                 break;
 
             case (byte)OpCodeValues.STAIndexedIndirect:
                 var zeroPageIndexX =
-                    (ushort)((readByte(ProgramCounter) + IX) % ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)((readByte(ProgramCounter) + IX) % MachineConstants.ProcessorSetup.MsbMultiplier);
                 var zeroPageLsbX = readByte(zeroPageIndexX);
                 var zeroPageMsbX =
-                    readByte((ushort)((zeroPageIndexX + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexX + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
                 var zeroPageAddressIndexedX =
-                    (ushort)(zeroPageLsbX + zeroPageMsbX * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)(zeroPageLsbX + zeroPageMsbX * MachineConstants.ProcessorSetup.MsbMultiplier);
                 writeByte(zeroPageAddressIndexedX, Accumulator);
                 ProgramCounter++;
                 break;
@@ -2020,9 +2039,9 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
                 var zeroPageIndexY = readByte(ProgramCounter);
                 var zeroPageLsbY = readByte(zeroPageIndexY);
                 var zeroPageMsbY =
-                    readByte((ushort)((zeroPageIndexY + 1) % ProcessorConstants.ProcessorSetup.MsbMultiplier));
+                    readByte((ushort)((zeroPageIndexY + 1) % MachineConstants.ProcessorSetup.MsbMultiplier));
                 var zeroPageAddressIndexY =
-                    (ushort)(zeroPageLsbY + zeroPageMsbY * ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                    (ushort)(zeroPageLsbY + zeroPageMsbY * MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 writeByte(zeroPageAddressIndexY, Accumulator);
                 ProgramCounter++;
                 break;
@@ -2120,14 +2139,14 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
             case (byte)OpCodeValues.STXZeroPageY:
                 var zeroPageAddressX =
-                    (ushort)(readByte(ProgramCounter++) + IY % ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)(readByte(ProgramCounter++) + IY % MachineConstants.ProcessorSetup.MsbMultiplier);
                 writeByte(zeroPageAddressX, IX);
                 break;
 
             case (byte)OpCodeValues.STXAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 writeByte(absoluteAddress, IX);
                 break;
         }
@@ -2155,7 +2174,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.STYAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 writeByte(absoluteAddress, IY);
                 break;
         }
@@ -2188,14 +2207,14 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
             case (byte)OpCodeValues.LDYAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 IY = readByte(absoluteAddress);
                 break;
 
             case (byte)OpCodeValues.LDYAbsoluteX:
                 var absoluteAddressX = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IX);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IX);
                 IY = readByte(absoluteAddressX);
                 break;
         }
@@ -2224,21 +2243,21 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
             case (byte)OpCodeValues.LDXZeroPageY:
                 var zeroPageAddressY =
-                    (ushort)(readByte(ProgramCounter++) + IY % ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                    (ushort)(readByte(ProgramCounter++) + IY % MachineConstants.ProcessorSetup.MsbMultiplier);
                 IX = readByte(zeroPageAddressY);
                 break;
 
             case (byte)OpCodeValues.LDXAbsolute:
                 var absoluteAddress = (ushort)(readByte(ProgramCounter++) +
                                                readByte(ProgramCounter++) *
-                                               ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                               MachineConstants.ProcessorSetup.MsbMultiplier);
                 IX = readByte(absoluteAddress);
                 break;
 
             case (byte)OpCodeValues.LDXAbsoluteY:
                 var absoluteAddressY = (ushort)(readByte(ProgramCounter++) +
                                                 readByte(ProgramCounter++) *
-                                                ProcessorConstants.ProcessorSetup.MsbMultiplier + IY);
+                                                MachineConstants.ProcessorSetup.MsbMultiplier + IY);
                 IX = readByte(absoluteAddressY);
                 break;
         }
@@ -2264,7 +2283,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
             case (byte)OpCodeValues.BITAbsolute:
                 address = (ushort)(readByte(ProgramCounter++) +
-                                   readByte(ProgramCounter++) * ProcessorConstants.ProcessorSetup.MsbMultiplier);
+                                   readByte(ProgramCounter++) * MachineConstants.ProcessorSetup.MsbMultiplier);
                 break;
 
             default:

@@ -9,4 +9,6 @@ public class ExecuteEventArgs : EventArgs
     public Registers? Registers { get; set; }
 
     public ushort Address { get; set; }
+
+    public IEnumerable<string> InstructionText { get; set; } = new List<string>();
 }

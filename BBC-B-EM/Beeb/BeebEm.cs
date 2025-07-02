@@ -3,6 +3,7 @@
 using System.Diagnostics;
 using _6502.Constants;
 using _6502.Engine;
+using _6502.Engine.Communication;
 using Hardware;
 
 public class BeebEm
@@ -24,26 +25,67 @@ public class BeebEm
         SpeechChip = new SpeechChip();
         SoundChip = new SoundChip();
         RomBank = new RomBank();
-        Keyboard = new Keyboard();
         Mc6850Acia = new Mc6850Acia();
         SerialULA = new SerialULA();
-        SystemVia = new Via6522(
-            Keyboard,
-            capsOn => Keyboard.CapsLockOn = capsOn,
-            baseAdr => BitmapVideoRenderer.VideoBase = baseAdr,
-            scanOn => Keyboard.AutoScanEnabled = scanOn,
-            speechOn => SpeechChip.Enabled = speechOn,
-            soundOn => SoundChip.Enabled = soundOn
-        );
+        Via6522 = new Via6522();
+        SystemVia = new SysVia(Via6522);
         OsRom = new OsRom();
         IoDevices = new IoDevices(SystemVia, RomBank, Mc6850Acia, SerialULA);
         Memory = new MemoryMap(RomBank, IoDevices, OsRom);
         Video = new VideoSystem(Memory);
         Sound = new SoundSystem();
-        Keyboard = new Keyboard();
 
         CPU = new Cpu6502(Memory.ReadByte, Memory.WriteByte);
-        SystemVia.SetInterruptHandlers(CPU.RaiseIrq, CPU.ClearIrq);
+
+        SystemVia.AttachIrq(() => CPU.RaiseIrq(), () => CPU.ClearIrq());
+
+        SystemVia.AttachPeripheralHandlers(
+            SetCapsLockLed,
+            SetShiftLockLed,
+            UpdateVideoBaseAddress,
+            HandleAutoScanChange,
+            EnableSpeechChip,
+            EnableSoundChip
+        );
+    }
+
+    public event LightChangedHandler? LightChanged;
+
+    private void SetCapsLockLed(bool on)
+    {
+        LightChanged?.Invoke(this,
+            new LightChangedEventArgs
+            {
+                IsOn = on,
+                Type = LEDType.CapsLock
+            });
+    }
+
+    private void SetShiftLockLed(bool on)
+    {
+        LightChanged?.Invoke(this,
+            new LightChangedEventArgs
+            {
+                IsOn = on,
+                Type = LEDType.ShiftLock
+            });
+    }
+
+    private void UpdateVideoBaseAddress(ushort addr)
+    {
+        // Optionally reconfigure video rendering logic here
+    }
+
+    private void HandleAutoScanChange(bool enabled)
+    {
+    }
+
+    private void EnableSpeechChip(bool on)
+    {
+    }
+
+    private void EnableSoundChip(bool on)
+    {
     }
 
     public void LoadRoms(string osRomPath, string? languageRomPath = null)
@@ -59,7 +101,9 @@ public class BeebEm
 
     public void Start()
     {
-        CPU.Initialise(ProcessorConstants.MachineSetup.BBCProcessorSpeed, ProcessorConstants.MachineSetup.BBCFrameRate);
+        SystemVia.Reset();
+
+        CPU.Initialise(MachineConstants.MachineSetup.BbcProcessorSpeed, MachineConstants.MachineSetup.BbcFrameRate);
 
         FrameCount = 0;
 
@@ -98,10 +142,7 @@ public class BeebEm
             var elapsedMicroseconds = elapsedTicks * 1_000_000 / Stopwatch.Frequency;
             viaTicksPending += elapsedMicroseconds;
 
-            while (viaTicksPending-- > 0)
-            {
-                SystemVia.Tick();
-            }
+            SystemVia.Tick((uint)viaTicksPending);
         }
     }
 
@@ -109,18 +150,18 @@ public class BeebEm
 
     public readonly Cpu6502 CPU;
     public readonly IoDevices IoDevices;
-    public readonly Keyboard Keyboard;
     public readonly MemoryMap Memory;
     public readonly OsRom OsRom;
     public readonly RomBank RomBank;
     public readonly SoundSystem Sound;
-    public readonly Via6522 SystemVia;
+    public readonly SysVia SystemVia;
     public readonly VideoSystem Video;
     public readonly SpeechChip SpeechChip;
     public readonly SoundChip SoundChip;
     public readonly BitmapVideoRenderer BitmapVideoRenderer;
     public readonly Mc6850Acia Mc6850Acia;
     private readonly SerialULA SerialULA;
+    public Via6522 Via6522;
 
     #endregion
 }

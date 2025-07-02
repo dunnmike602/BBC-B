@@ -1,6 +1,6 @@
 ﻿namespace MLDComputing.Emulators.BBCSim.Enums;
 
-public enum Key
+public enum WindowsKey
 {
     /// <summary>
     ///     No key pressed.

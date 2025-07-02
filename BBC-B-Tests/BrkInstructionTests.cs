@@ -140,8 +140,8 @@ public class BrkInstructionTests : TestBase
         var low = (byte)(IrqHandler & 0xFF);
         var high = (byte)(IrqHandler >> 8);
 
-        MemoryMap!.WriteByte(ProcessorConstants.ProcessorSetup.IrqHandlerLowByte, low);
-        MemoryMap!.WriteByte(ProcessorConstants.ProcessorSetup.IrqHandlerHighByte, high);
+        MemoryMap!.WriteByte(MachineConstants.ProcessorSetup.IrqHandlerLowByte, low);
+        MemoryMap!.WriteByte(MachineConstants.ProcessorSetup.IrqHandlerHighByte, high);
 
         // Illegal opcode sentinel
         MemoryMap!.WriteByte(IrqHandler, 2);

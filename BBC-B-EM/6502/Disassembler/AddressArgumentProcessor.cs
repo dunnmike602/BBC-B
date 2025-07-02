@@ -35,27 +35,27 @@ public class AddressArgumentProcessor : IAddressArgumentProcessor
                 return ((int)operands[0]).ConvertToBaseWithPrefix(radix, byte.MaxValue);
 
             case AddressingModes.Absolute:
-                return (operands[0] + operands[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier)
+                return (operands[0] + operands[1] * MachineConstants.ProcessorSetup.MsbMultiplier)
                     .ConvertToBaseWithPrefix(radix,
                         ushort
                             .MaxValue);
 
             case AddressingModes.AbsoluteX:
-                return (operands[0] + operands[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier)
+                return (operands[0] + operands[1] * MachineConstants.ProcessorSetup.MsbMultiplier)
                        .ConvertToBaseWithPrefix(radix,
                            ushort
                                .MaxValue) +
                        ",X";
 
             case AddressingModes.AbsoluteY:
-                return (operands[0] + operands[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier)
+                return (operands[0] + operands[1] * MachineConstants.ProcessorSetup.MsbMultiplier)
                        .ConvertToBaseWithPrefix(radix,
                            ushort
                                .MaxValue) +
                        ",Y";
 
             case AddressingModes.Indirect:
-                return "(" + (operands[0] + operands[1] * ProcessorConstants.ProcessorSetup.MsbMultiplier)
+                return "(" + (operands[0] + operands[1] * MachineConstants.ProcessorSetup.MsbMultiplier)
                     .ConvertToBaseWithPrefix(
                         radix,
                         ushort.MaxValue) + ")";

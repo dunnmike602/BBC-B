@@ -48,10 +48,6 @@ public class MemoryMap(RomBank romBank, IoDevices io, OsRom osRom)
 
     public void WriteByte(ushort address, byte value)
     {
-        if (address == 0x028F)
-        {
-        }
-
         switch (address)
         {
             case < 0x8000:
