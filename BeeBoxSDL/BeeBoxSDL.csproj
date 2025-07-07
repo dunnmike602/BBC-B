@@ -11,10 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="6502\Disassembler\Resources\json.txt" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
   </ItemGroup>
 
@@ -23,7 +19,23 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\BBC-B-EM\Roms\BASIC2.rom" Link="Roms\BASIC2.rom">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="..\BBC-B-EM\Roms\OS12.rom" Link="Roms\OS12.rom">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BBC-B-EM\BBC-B.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Libs\SDL3.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Roms\mode7font.rom">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

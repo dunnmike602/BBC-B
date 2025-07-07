@@ -1,60 +1,55 @@
-﻿using static SDL2.SDL;
+﻿using BeeBoxSDL.Core;
+using BeeBoxSDL.Mapper;
+using MLDComputing.Emulators.BBCSim.Beeb;
+using SDL2;
 
-const int ScreenWidth = 640;
-const int ScreenHeight = 256;
-const int PixelScale = 2;
+var keyMapper = InitkKeyMapper();
 
-if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
+var vm = new BeebEm();
+var osPath = Path.Combine(AppContext.BaseDirectory, "roms", string.Intern("os12.rom"));
+var basicPath = Path.Combine(AppContext.BaseDirectory, "roms", "basic2.rom");
+var fontPath = Path.Combine(AppContext.BaseDirectory, "roms", "mode7font.rom");
+
+vm.LoadRoms(osPath, basicPath);
+
+using var renderer = new TeletextSdlRenderer();
+renderer.Create(fontPath);
+
+vm.FrameReady += (o, eventArgs) =>
 {
-    Console.WriteLine("SDL could not initialize! SDL_Error: " + SDL_GetError());
-    return;
-}
-
-var window = SDL_CreateWindow("BBC Micro Emulator",
-    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-    ScreenWidth * PixelScale, ScreenHeight * PixelScale,
-    SDL_WindowFlags.SDL_WINDOW_SHOWN);
-
-var renderer = SDL_CreateRenderer(window, -1, SDL_RendererFlags.SDL_RENDERER_ACCELERATED);
-var texture = SDL_CreateTexture(renderer,
-    SDL_PIXELFORMAT_ARGB8888,
-    (int)SDL_TextureAccess.SDL_TEXTUREACCESS_STREAMING,
-    ScreenWidth, ScreenHeight);
-
-var running = true;
-var frameBuffer = new byte[ScreenWidth * ScreenHeight * 4]; // ARGB
-
-while (running)
-{
-    while (SDL_PollEvent(out var e) == 1)
+    while (SDL.SDL_PollEvent(out var sdlEvent) == 1)
     {
-        if (e.type == SDL_EventType.SDL_QUIT)
-        {
-            running = false;
-        }
-        // Handle input here
-    }
+        var keycode = sdlEvent.key.keysym.sym;
+        var mod = sdlEvent.key.keysym.mod;
 
-    // Emulator step
-    // cpu.Step();
-    // render framebuffer...
+        var virtualKey = SdlKeyTranslator.SdlToVirtualKey(keycode); // Same as KeyInterop.VirtualKeyFromKey
+        var shiftHeld = (mod & SDL.SDL_Keymod.KMOD_LSHIFT) != 0 || (mod & SDL.SDL_Keymod.KMOD_RSHIFT) != 0;
+        var mapping = keyMapper.ProcessKeyPress(virtualKey, shiftHeld, sdlEvent.type == SDL.SDL_EventType.SDL_KEYDOWN);
 
-    unsafe
-    {
-        fixed (byte* ptr = frameBuffer)
+        switch (sdlEvent.type)
         {
-            SDL_UpdateTexture(texture, IntPtr.Zero, (IntPtr)ptr, ScreenWidth * 4);
+            case SDL.SDL_EventType.SDL_QUIT:
+                vm.MachineIsRunning = false;
+                return;
+
+            case SDL.SDL_EventType.SDL_KEYDOWN:
+                vm.KeyboardMatrix.PressKey(mapping.Row, mapping.Column);
+                break;
+
+            case SDL.SDL_EventType.SDL_KEYUP:
+                vm.KeyboardMatrix.ReleaseKey(mapping.Row, mapping.Column);
+                break;
         }
     }
 
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, texture, IntPtr.Zero, IntPtr.Zero);
-    SDL_RenderPresent(renderer);
+    renderer.Render(vm.Memory.GetVideoBuffer());
+};
 
-    SDL_Delay(16); // ~60Hz
+vm.Start();
+
+KeyMapper InitkKeyMapper()
+{
+    var keyMapper = new KeyMapper();
+    keyMapper.InitKeyMaps();
+    return keyMapper;
 }
-
-SDL_DestroyTexture(texture);
-SDL_DestroyRenderer(renderer);
-SDL_DestroyWindow(window);
-SDL_Quit();

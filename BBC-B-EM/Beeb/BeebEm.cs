@@ -12,7 +12,7 @@ public class BeebEm
 
     public double CpuSpeedMhz;
 
-    public int FrameCount;
+    public ulong FrameCount;
 
     public double FrameRate;
 
@@ -48,6 +48,8 @@ public class BeebEm
     }
 
     public KeyboardMatrix KeyboardMatrix { get; set; }
+
+    public event FrameReady? FrameReady;
 
     public event LightChangedHandler? LightChanged;
 
@@ -95,19 +97,10 @@ public class BeebEm
         }
     }
 
+
     public void Start()
     {
-        SystemVia.Reset();
-
-        CPU.Initialise(MachineConstants.MachineSetup.BbcProcessorSpeed, MachineConstants.MachineSetup.BbcFrameRate);
-
-        FrameCount = 0;
-
-        MachineIsRunning = true;
-
-        var lastFrameTimestamp = Stopwatch.GetTimestamp();
-        long viaTicksPending = 0;
-        var lastStopwatchTimestamp = Stopwatch.GetTimestamp();
+        var lastFrameTimestamp = InitMachine(out var viaTicksPending, out var lastStopwatchTimestamp);
 
         while (MachineIsRunning)
         {
@@ -120,6 +113,7 @@ public class BeebEm
 
             // Run one frame worth of CPU
             var totalCycle = CPU.RunSingleFrame();
+
             CpuSpeedMhz = totalCycle * (ulong)Stopwatch.Frequency / (deltaTicks * 1_000_000.0);
             FrameCount++;
 
@@ -130,16 +124,25 @@ public class BeebEm
                 spinner.SpinOnce();
             }
 
-            // Update VIA timer based on real elapsed time
-            var now = Stopwatch.GetTimestamp();
-            var elapsedTicks = now - lastStopwatchTimestamp;
-            lastStopwatchTimestamp = now;
-
-            var elapsedMicroseconds = elapsedTicks * 1_000_000 / Stopwatch.Frequency;
-            viaTicksPending += elapsedMicroseconds;
-
-            SystemVia.Tick((uint)viaTicksPending);
+            FrameReady?.Invoke(this,
+                new FrameReadyEventArgs { FrameCount = FrameCount, CpuSpeedMhz = CpuSpeedMhz, FrameRate = FrameRate });
         }
+    }
+
+    private long InitMachine(out long viaTicksPending, out long lastStopwatchTimestamp)
+    {
+        SystemVia.Reset();
+
+        CPU.Initialise(MachineConstants.MachineSetup.BbcProcessorSpeed, MachineConstants.MachineSetup.BbcFrameRate);
+
+        FrameCount = 0;
+
+        MachineIsRunning = true;
+
+        var lastFrameTimestamp = Stopwatch.GetTimestamp();
+        viaTicksPending = 0;
+        lastStopwatchTimestamp = Stopwatch.GetTimestamp();
+        return lastFrameTimestamp;
     }
 
     #region Hardware

@@ -61,7 +61,7 @@ public class SysVia
         _keyboardMatrix.ReleaseAllKeys();
     }
 
-    public void Tick(uint ncycles)
+    public void Tick(long ncycles)
     {
         _via.Timer1Counter -= (int)ncycles;
 
@@ -76,8 +76,6 @@ public class SysVia
         }
 
         DoKbdIntCheck();
-
-        _keyboardMatrix.ClearReleasedLatches();
     }
 
     private void TickReal()
@@ -505,21 +503,6 @@ public class SysVia
             return; // Only trigger on positive edge
         }
 
-        // Always update LastScanCycle if possible — not just when firing IRQs
-        if ((_via.IC32State & MachineConstants.Ic32Constants.Ic32KeyboardWrite) != 0)
-        {
-            _keyboardMatrix.MarkFullScan();
-        }
-        else if (_kbdCol < 15)
-        {
-            for (var row = 1; row < 8; row++)
-            {
-                if (_keyboardMatrix.IsKeyActive(row, _kbdCol))
-                {
-                    _keyboardMatrix.OnKeyScan(row, _kbdCol);
-                }
-            }
-        }
 
         // Now do the IRQ logic — but scanning always happens above
         if (!_keyboardMatrix.AnyKeyActive())

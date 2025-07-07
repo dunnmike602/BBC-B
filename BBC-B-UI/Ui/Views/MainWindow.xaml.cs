@@ -23,6 +23,7 @@ using BBCSim._6502.Extensions;
 using BBCSim._6502.Storage;
 using BBCSim.Beeb;
 using BBCSim.Beeb.Hardware;
+using BBCSim.Enums;
 using BBCSim.Mapper;
 using Domain;
 using Extensions;
@@ -63,6 +64,7 @@ public partial class MainWindow : INotifyPropertyChanged
     private DispatcherTimer _renderTimer;
 
     private ObservableCollection<MemoryByte> _stackDisassembly;
+    private long _start;
 
     private Stopwatch _sw = new();
 
@@ -434,14 +436,33 @@ public partial class MainWindow : INotifyPropertyChanged
 
         var mapping = _keyMapper.ProcessKeyPress(keyCode, shiftHeld, false); // Key up
 
-        _vm.KeyboardMatrix.ReleaseKey(mapping.Row, mapping.Column);
+        PerformDelayRelease(mapping);
+
         e.Handled = true;
-        Debug.Print("keyup: occurred:" + Stopwatch.GetTimestamp());
+    }
+
+    /// <summary>
+    ///     Ensures keyups do not happen too quickly
+    /// </summary>
+    private void PerformDelayRelease(KeyMapping mapping)
+    {
+        long timeoutMicroseconds = 500_000;
+        var timeoutTicks = timeoutMicroseconds * Stopwatch.Frequency / 1_000_000;
+        var deadline = _start + timeoutTicks;
+
+        var spinner = new SpinWait();
+        while (Stopwatch.GetTimestamp() <= deadline)
+        {
+            spinner.SpinOnce();
+        }
+
+        _vm.KeyboardMatrix.ReleaseKey(mapping.Row, mapping.Column);
     }
 
     private void MainWindow_KeyDown(object sender, KeyEventArgs e)
     {
-        Debug.Print("Keydown: occurred:" + Stopwatch.GetTimestamp());
+        _start = Stopwatch.GetTimestamp();
+
         var focusedElement = Keyboard.FocusedElement as FrameworkElement;
 
         if (focusedElement!.GetType() != typeof(ScrollViewer))

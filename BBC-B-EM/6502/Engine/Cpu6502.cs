@@ -201,12 +201,6 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private int ExecuteNext()
     {
-        if (ProgramCounter == 0xF129)
-        {
-            Debug.Print("Autoscan complete " + Stopwatch.GetTimestamp());
-        }
-
-        // Debug.Print($"PC={ProgramCounter:X4}");
         var opCode = readByte(ProgramCounter);
 
         var instruction = _instructions![opCode];
