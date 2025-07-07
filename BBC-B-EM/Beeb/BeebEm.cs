@@ -20,15 +20,14 @@ public class BeebEm
 
     public BeebEm()
     {
-        BitmapVideoRenderer = new BitmapVideoRenderer();
-
+        KeyboardMatrix = new KeyboardMatrix();
         SpeechChip = new SpeechChip();
         SoundChip = new SoundChip();
         RomBank = new RomBank();
         Mc6850Acia = new Mc6850Acia();
         SerialULA = new SerialULA();
         Via6522 = new Via6522();
-        SystemVia = new SysVia(Via6522);
+        SystemVia = new SysVia(Via6522, KeyboardMatrix);
         OsRom = new OsRom();
         IoDevices = new IoDevices(SystemVia, RomBank, Mc6850Acia, SerialULA);
         Memory = new MemoryMap(RomBank, IoDevices, OsRom);
@@ -43,11 +42,12 @@ public class BeebEm
             SetCapsLockLed,
             SetShiftLockLed,
             UpdateVideoBaseAddress,
-            HandleAutoScanChange,
             EnableSpeechChip,
             EnableSoundChip
         );
     }
+
+    public KeyboardMatrix KeyboardMatrix { get; set; }
 
     public event LightChangedHandler? LightChanged;
 
@@ -74,10 +74,6 @@ public class BeebEm
     private void UpdateVideoBaseAddress(ushort addr)
     {
         // Optionally reconfigure video rendering logic here
-    }
-
-    private void HandleAutoScanChange(bool enabled)
-    {
     }
 
     private void EnableSpeechChip(bool on)
@@ -124,7 +120,7 @@ public class BeebEm
 
             // Run one frame worth of CPU
             var totalCycle = CPU.RunSingleFrame();
-            CpuSpeedMhz = totalCycle * Stopwatch.Frequency / (deltaTicks * 1_000_000.0);
+            CpuSpeedMhz = totalCycle * (ulong)Stopwatch.Frequency / (deltaTicks * 1_000_000.0);
             FrameCount++;
 
             // Wait until next frame deadline
@@ -158,7 +154,6 @@ public class BeebEm
     public readonly VideoSystem Video;
     public readonly SpeechChip SpeechChip;
     public readonly SoundChip SoundChip;
-    public readonly BitmapVideoRenderer BitmapVideoRenderer;
     public readonly Mc6850Acia Mc6850Acia;
     private readonly SerialULA SerialULA;
     public Via6522 Via6522;

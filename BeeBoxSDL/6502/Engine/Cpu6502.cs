@@ -1,4 +1,4 @@
-﻿namespace MLDComputing.Emulators.BBCSim._6502.Engine;
+﻿namespace BeeBoxSDL._6502.Engine;
 
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -15,8 +15,7 @@ using Byte = Storage.Byte;
 
 public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> writeByte)
 {
-    public static ulong TotalCyclesExecuted;
-    private ulong _cyclesPerFrame;
+    private int _cyclesPerFrame;
 
     private Instruction[]? _instructions;
 
@@ -36,7 +35,13 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
     public bool SingleStepModeOn;
 
-    public ulong VideoFrameIntervalTicks;
+    public long TotalCyclesExecuted;
+
+    public long TotalElapsedInterruptTicks;
+
+    public long TotalElapsedTicks;
+
+    public long VideoFrameIntervalTicks;
 
     public event ExecuteHandler? Execute;
 
@@ -69,7 +74,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
         CyclesPerSecond = cyclesPerSecond;
 
-        VideoFrameIntervalTicks = (uint)(1 / (float)videoFrameRate * Stopwatch.Frequency);
+        VideoFrameIntervalTicks = (int)(1 / (float)videoFrameRate * Stopwatch.Frequency);
 
         _cyclesPerFrame = GetNumberOfInstructionsPerVideoRefresh();
 
@@ -108,6 +113,9 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
         IY = 0;
         Status = Status.SetBit((Byte)Statuses.Unused, Bit.One);
         StackPointer = 0xFF;
+
+        TotalElapsedTicks = 0;
+        TotalElapsedInterruptTicks = 0;
     }
 
 
@@ -119,15 +127,15 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ulong RunSingleFrame()
+    public long RunSingleFrame()
     {
-        ulong frameCycles = 0;
+        var frameCycles = 0;
 
         try
         {
             while (frameCycles < _cyclesPerFrame)
             {
-                var used = (ulong)ExecuteNext();
+                var used = ExecuteNext();
 
                 if (_irqPending && Status.GetBit((Byte)Statuses.InterruptDisable) == Bit.Zero)
                 {
@@ -143,7 +151,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
                 frameCycles += used;
 
-                TotalCyclesExecuted = ulong.MaxValue - used <= TotalCyclesExecuted
+                TotalCyclesExecuted = long.MaxValue - used <= TotalCyclesExecuted
                     ? used
                     : TotalCyclesExecuted + used;
 
@@ -191,21 +199,16 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
         ProgramCounter = (ushort)(lo + (hi << 8));
     }
 
-    private ulong GetNumberOfInstructionsPerVideoRefresh()
+    private int GetNumberOfInstructionsPerVideoRefresh()
     {
         var cyclesPerTick = CyclesPerSecond / (float)Stopwatch.Frequency;
 
-        return (ulong)(cyclesPerTick * VideoFrameIntervalTicks);
+        return (int)(cyclesPerTick * VideoFrameIntervalTicks);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private int ExecuteNext()
     {
-        if (ProgramCounter == 0xF129)
-        {
-            Debug.Print("Autoscan complete " + Stopwatch.GetTimestamp());
-        }
-
         // Debug.Print($"PC={ProgramCounter:X4}");
         var opCode = readByte(ProgramCounter);
 
@@ -236,7 +239,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
             if (EnableLogging)
             {
-                var line = _dis!.Disassemble(readByte, ProgramCounter, (ushort)(ProgramCounter + instruction.Bytes), 16)
+                var line = _dis.Disassemble(readByte, ProgramCounter, (ushort)(ProgramCounter + instruction.Bytes), 16)
                     .Select(op => op.MemoryAddress.ToString("X4") + " " + op.Definition?.Mnemonic + " " + op.Argument);
 
                 executeEventArgs.InstructionText = line;
@@ -525,7 +528,7 @@ public partial class Cpu6502(Func<ushort, byte> readByte, Action<ushort, byte> w
 
     private bool _irqPending;
 
-    private IDisassembler? _dis;
+    private IDisassembler _dis;
 
     #endregion
 

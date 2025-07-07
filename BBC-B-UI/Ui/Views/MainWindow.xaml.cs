@@ -5,20 +5,17 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Threading;
+using BBCSim._6502.Constants;
 using BBCSim._6502.Disassembler;
 using BBCSim._6502.Engine;
 using BBCSim._6502.Engine.Communication;
@@ -29,6 +26,7 @@ using BBCSim.Beeb.Hardware;
 using BBCSim.Mapper;
 using Domain;
 using Extensions;
+using Screen;
 using Byte = BBCSim._6502.Storage.Byte;
 
 public partial class MainWindow : INotifyPropertyChanged
@@ -38,12 +36,13 @@ public partial class MainWindow : INotifyPropertyChanged
     private const double CharWidth = 16; // adjust to your font’s cell width
     private const double CharHeight = 20; // adjust to your font’s cell height
 
-    private const int WM_KEYDOWN = 0x0100;
-    private const int WM_KEYUP = 0x0101;
-
     private readonly AutoResetEvent _event = new(false);
 
     private readonly double _max;
+
+    private readonly TeletextBitmapRenderer _renderer = new("./resources/mode7font.bin");
+
+    private readonly byte[] _teletextBuffer = new byte[MachineConstants.MachineSetup.TeletextBuffer];
 
     private ObservableCollection<string> _codeLabelsData;
 
@@ -53,17 +52,19 @@ public partial class MainWindow : INotifyPropertyChanged
 
     private ObservableCollection<Instruction> _disassembly;
 
+    private bool _flashPhase;
+
+    private DispatcherTimer _flashTimer;
+
     private long _instructionCount;
 
     private KeyMapper _keyMapper;
+
     private DispatcherTimer _renderTimer;
-    private HwndSource _source;
 
     private ObservableCollection<MemoryByte> _stackDisassembly;
 
     private Stopwatch _sw = new();
-
-    private Typeface _teletextTypeface;
 
     private long _time;
 
@@ -172,12 +173,21 @@ public partial class MainWindow : INotifyPropertyChanged
         _keyMapper.InitKeyMaps();
     }
 
+    private void SetupFlashDisplay()
+    {
+        _flashTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(500)
+        };
+
+        _flashTimer.Tick += (s, e) => { _flashPhase = !_flashPhase; };
+
+        _flashTimer.Start();
+    }
+
     private void SetupTeletextDisplay()
     {
         // Load the Teletext font
-        _teletextTypeface = new Typeface(new FontFamily(new Uri("pack://application:,,,/"), "./Fonts/#Teletext"),
-            FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
-
         _renderTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(20) // 50Hz
@@ -186,11 +196,34 @@ public partial class MainWindow : INotifyPropertyChanged
         _renderTimer.Tick += (_, _) =>
         {
             ProcessRegisters();
-            RenderTeletextScreen(_vm.Memory.GetVideoBuffer());
+            RenderScreenHelper();
             UpdateMachineAttributes();
         };
 
         _renderTimer.Start();
+    }
+
+    private void RenderScreenHelper()
+    {
+        var bbcVideoMemory = _vm.Memory.GetVideoBuffer();
+
+        Array.Copy(bbcVideoMemory, 0, _teletextBuffer, 0, MachineConstants.MachineSetup.TeletextBuffer);
+
+        _renderer.Render(_teletextBuffer);
+
+        TeletextCanvas.Children.Clear();
+
+        var image = new Image
+        {
+            Source = _renderer.Bitmap,
+            Width = _renderer.Bitmap.PixelWidth,
+            Height = _renderer.Bitmap.PixelHeight
+        };
+
+        Canvas.SetLeft(image, 0);
+        Canvas.SetTop(image, 0);
+
+        TeletextCanvas.Children.Add(image);
     }
 
     private void UpdateMachineAttributes()
@@ -209,46 +242,6 @@ public partial class MainWindow : INotifyPropertyChanged
             else
             {
                 stackFrame.StackPointer = string.Empty;
-            }
-        }
-    }
-
-    private void RenderTeletextScreen(byte[] buffer)
-    {
-        TeletextCanvas.Children.Clear();
-
-        for (var row = 0; row < Rows; row++)
-        {
-            for (var col = 0; col < Columns; col++)
-            {
-                var ch = buffer[row * Columns + col];
-
-                if (ch < 32 || ch > 127)
-                {
-                    continue;
-                }
-
-                var text = new FormattedText(
-                    ((char)ch).ToString(),
-                    CultureInfo.InvariantCulture,
-                    FlowDirection.LeftToRight,
-                    _teletextTypeface,
-                    20, // Font size
-                    Brushes.White, // Typical teletext color
-                    VisualTreeHelper.GetDpi(this).PixelsPerDip
-                );
-
-                var textBlock = new TextBlock
-                {
-                    Text = ((char)ch).ToString(),
-                    FontFamily = _teletextTypeface.FontFamily,
-                    FontSize = 20,
-                    Foreground = Brushes.White
-                };
-
-                Canvas.SetLeft(textBlock, col * CharWidth);
-                Canvas.SetTop(textBlock, row * CharHeight);
-                TeletextCanvas.Children.Add(textBlock);
             }
         }
     }
@@ -272,15 +265,9 @@ public partial class MainWindow : INotifyPropertyChanged
 
         _vm.LoadRoms(osPath, basicPath);
 
-        RenderTeletextScreen(_vm.Memory.GetVideoBuffer());
+        RenderScreenHelper();
 
-        FitTeletextScreen();
-    }
-
-    private void FitTeletextScreen()
-    {
-        TeletextCanvas.Width = Columns * CharWidth;
-        TeletextCanvas.Height = Rows * CharHeight;
+        //     FitTeletextScreen();
     }
 
     private void GetDisassembly()
@@ -435,7 +422,6 @@ public partial class MainWindow : INotifyPropertyChanged
 
     private void MainWindow_KeyUp(object sender, KeyEventArgs e)
     {
-        return;
         var focusedElement = Keyboard.FocusedElement as FrameworkElement;
 
         if (focusedElement!.GetType() != typeof(ScrollViewer))
@@ -448,13 +434,14 @@ public partial class MainWindow : INotifyPropertyChanged
 
         var mapping = _keyMapper.ProcessKeyPress(keyCode, shiftHeld, false); // Key up
 
-        _vm.SystemVia.KeyUp(mapping.Row, mapping.Column);
+        _vm.KeyboardMatrix.ReleaseKey(mapping.Row, mapping.Column);
         e.Handled = true;
+        Debug.Print("keyup: occurred:" + Stopwatch.GetTimestamp());
     }
 
     private void MainWindow_KeyDown(object sender, KeyEventArgs e)
     {
-        return;
+        Debug.Print("Keydown: occurred:" + Stopwatch.GetTimestamp());
         var focusedElement = Keyboard.FocusedElement as FrameworkElement;
 
         if (focusedElement!.GetType() != typeof(ScrollViewer))
@@ -472,7 +459,8 @@ public partial class MainWindow : INotifyPropertyChanged
 
         LogScreen.Text += KeyPress.Text + Environment.NewLine;
 
-        _vm.SystemVia.KeyDown(mapping.Row, mapping.Column);
+        _vm.KeyboardMatrix.PressKey(mapping.Row, mapping.Column);
+        _vm.SystemVia.DoKbdIntCheck(); // <- required to trigger CA2 interrupt
         e.Handled = true;
     }
 
@@ -529,10 +517,10 @@ public partial class MainWindow : INotifyPropertyChanged
             switch (e.Type)
             {
                 case LEDType.CapsLock:
-                    CapsLock.IsOn = e.IsOn;
+                    CapsLock.ActiveLed = e.IsOn ? 1 : 0;
                     return;
                 case LEDType.ShiftLock:
-                    ShiftLock.IsOn = e.IsOn;
+                    ShiftLock.ActiveLed = e.IsOn ? 1 : 0;
                     return;
             }
         });
@@ -732,6 +720,8 @@ public partial class MainWindow : INotifyPropertyChanged
         Keyboard.Focus(this);
 
         SetupTeletextDisplay();
+
+        SetupFlashDisplay();
     }
 
     private void EnableProcessorEvents_OnChecked(object sender, RoutedEventArgs e)
@@ -741,51 +731,11 @@ public partial class MainWindow : INotifyPropertyChanged
 
     private void MainWindow_OnDeactivated(object sender, EventArgs e)
     {
-        _vm.SystemVia.ReleaseAllKeys();
+        //   _vm.KeyboardMatrix.ReleaseAllKeys();
     }
 
     private void EnableLogging_OnChecked(object sender, RoutedEventArgs e)
     {
         _vm.CPU.EnableLogging = EnableLogging.IsChecked!.Value;
-    }
-
-
-    protected override void OnSourceInitialized(EventArgs e)
-    {
-        base.OnSourceInitialized(e);
-        _source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
-        _source.AddHook(WndProc); // Hook raw Win32 messages
-    }
-
-    [DllImport("user32.dll")]
-    private static extern short GetKeyState(int nVirtKey);
-
-    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-    {
-        if (msg == WM_KEYDOWN || msg == WM_KEYUP)
-        {
-            var keyCode = wParam.ToInt32();
-
-            var shiftHeld = (GetKeyState((int)Key.LeftShift) & 0x8000) != 0 ||
-                            (GetKeyState((int)Key.RightShift) & 0x8000) != 0;
-
-            var isKeyUp = msg == WM_KEYUP;
-
-            var mapping = _keyMapper.ProcessKeyPress(keyCode, shiftHeld, isKeyUp);
-
-            // Now use mapping (e.g., call KeyDown/KeyUp on the emulator)
-            if (!isKeyUp && mapping is { } down)
-            {
-                _vm.SystemVia.KeyDown(down.Row, down.Column);
-            }
-            else if (isKeyUp && mapping is { } up)
-            {
-                _vm.SystemVia.KeyUp(up.Row, up.Column);
-            }
-
-            handled = true;
-        }
-
-        return IntPtr.Zero;
     }
 }

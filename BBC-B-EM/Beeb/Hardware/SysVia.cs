@@ -5,10 +5,8 @@ using _6502.Constants;
 public class SysVia
 {
     private readonly bool[] _joystickButton = [false, false];
-    private readonly bool[,] _keyboardState = new bool[16, 8];
+    private readonly KeyboardMatrix _keyboardMatrix;
     private readonly Via6522 _via;
-
-    private Action<bool>? _autoScanHandler;
 
     private bool _ca1Line = true;
 
@@ -18,7 +16,6 @@ public class SysVia
     private Action<bool>? _capsLockHandler;
 
     private int _kbdCol, _kbdRow;
-    private bool _keyUpHappened;
 
     private Action? _raiseIRQ;
     private Action<bool>? _shiftLockHandler;
@@ -30,13 +27,12 @@ public class SysVia
     private ushort _videoBase;
     private Action<ushort>? _videoBaseHandler;
 
-    public SysVia(Via6522 via)
+    public SysVia(Via6522 via, KeyboardMatrix keyboardMatrix)
     {
         _via = via;
+        _keyboardMatrix = keyboardMatrix;
         _via.Reset();
     }
-
-    private int? LatchedKeycode { get; set; }
 
     private int KeysDown { get; set; }
 
@@ -62,8 +58,7 @@ public class SysVia
     public void Reset()
     {
         _via.Reset();
-        ReleaseAllKeys();
-        LatchedKeycode = null;
+        _keyboardMatrix.ReleaseAllKeys();
     }
 
     public void Tick(uint ncycles)
@@ -81,6 +76,8 @@ public class SysVia
         }
 
         DoKbdIntCheck();
+
+        _keyboardMatrix.ClearReleasedLatches();
     }
 
     private void TickReal()
@@ -103,6 +100,7 @@ public class SysVia
             if (!_via.Timer1HasFinished || (_via.ACR & 0x40) != 0)
             {
                 _via.IFR |= 0x40; // Timer 1 interrupt
+
                 UpdateIFRTopBit();
 
                 if ((_via.ACR & 0x80) != 0)
@@ -129,7 +127,6 @@ public class SysVia
                 _via.IFR |= 0x20; // Timer 2 interrupt
                 UpdateIFRTopBit();
 
-
                 _via.Timer2HasFinished = true;
             }
         }
@@ -140,31 +137,40 @@ public class SysVia
         }
     }
 
+
     public byte Read(int offset)
     {
-        byte returnValue = 0xff;
+        var returnValue = (byte)0xFF;
 
         switch (offset)
         {
             case 0: // IRB read
-                // Clear bit 4 of IFR from AtoD Conversion
-                _via.IFR &= MachineConstants.BitPatterns.ClearBit4; // Also clears bit 4
+            {
+                _via.IFR &= MachineConstants.BitPatterns.ClearBit4;
 
-                returnValue = (byte)(_via.ORB & _via.DDRB);
+                // Retrieve selected row from ORA
+                var selectedRow = _via.ORA & 0x07; // bottom 3 bits only
 
+                // Use keyboard matrix logic to get column bits (active low)
+                var keyColumnBits = _keyboardMatrix.GetColumnByte(selectedRow);
+
+                // Combine with ORB/DDRB to simulate VIA Port B
+                returnValue = (byte)((_via.ORB & _via.DDRB) | (keyColumnBits & ~_via.DDRB));
+
+                // Overlay joystick button bits if needed
                 if (!_joystickButton[1])
                 {
-                    returnValue |= 0x20;
+                    returnValue &= 0xDF; // clear bit 5
                 }
 
                 if (!_joystickButton[0])
                 {
-                    returnValue |= 0x10;
+                    returnValue &= 0xEF; // clear bit 4
                 }
 
-                // TODO If Speech Enabled code required here
                 UpdateIFRTopBit();
                 break;
+            }
 
             case 2:
                 returnValue = _via.DDRB;
@@ -264,7 +270,10 @@ public class SysVia
             return false; // Key not down if overrange - perhaps we should do something more?
         }
 
-        return _keyboardState[_kbdCol, _kbdRow];
+        var isKeyActive = _keyboardMatrix.IsKeyActive(_kbdRow, _kbdCol);
+
+
+        return isKeyActive;
     }
 
     private byte SlowDataBusRead()
@@ -273,16 +282,12 @@ public class SysVia
 
         if ((_via.IC32State & MachineConstants.Ic32Constants.Ic32KeyboardWrite) == 0)
         {
-            if (LatchedKeycode.HasValue)
+            if (KbdOP())
             {
-                result = (byte)(0x80 | (LatchedKeycode.Value & 0x7F));
-                ClearLatchedKeyIfNotHeld(); // ✅ safe latch clearing
-            }
-            else
-            {
-                result &= 0x7F; // no key latched
+                result |= 128;
             }
         }
+
 
         // TODO MOre speech stuff here
 
@@ -459,58 +464,6 @@ public class SysVia
         _ca1Line = level;
     }
 
-    public void KeyDown(int row, int col)
-    {
-        if (!_keyboardState[col, row] && row != 0)
-        {
-            KeysDown++;
-        }
-
-        _keyboardState[col, row] = true;
-
-        // Latch key if not already latched
-        LatchedKeycode ??= (col & 0x0F) | ((row & 0x07) << 4);
-
-        DoKbdIntCheck();
-    }
-
-    public void KeyUp(int row, int col)
-    {
-        if (row < 0 || col < 0)
-        {
-            return;
-        }
-
-        _keyUpHappened = true;
-    }
-
-    public void ClearLatchedKeyIfNotHeld()
-    {
-        if (LatchedKeycode.HasValue)
-        {
-            var code = LatchedKeycode.Value;
-            var row = (code >> 4) & 0x07;
-            var col = code & 0x0F;
-
-            if (!_keyboardState[col, row])
-            {
-                LatchedKeycode = null;
-            }
-        }
-    }
-
-    public void ReleaseAllKeys()
-    {
-        for (var row = 0; row < 8; row++)
-        for (var col = 0; col < 16; col++)
-        {
-            _keyboardState[col, row] = false;
-        }
-
-        KeysDown = 0;
-        //      LatchedKeycode = null;
-    }
-
     public void AttachIrq(Action? raiseIRQ, Action? cancelIRQ)
     {
         _raiseIRQ = raiseIRQ;
@@ -521,14 +474,12 @@ public class SysVia
         Action<bool>? capsLock = null,
         Action<bool>? shiftLock = null,
         Action<ushort>? videoBase = null,
-        Action<bool>? autoScan = null,
         Action<bool>? speech = null,
         Action<bool>? sound = null)
     {
-        _shiftLockHandler = capsLock;
-        _capsLockHandler = shiftLock;
+        _shiftLockHandler = shiftLock;
+        _capsLockHandler = capsLock;
         _videoBaseHandler = videoBase;
-        _autoScanHandler = autoScan;
         _speechHandler = speech;
         _soundHandler = sound;
     }
@@ -547,29 +498,54 @@ public class SysVia
         }
     }
 
-    private void DoKbdIntCheck()
+    public void DoKbdIntCheck()
     {
-        if (KeysDown > 0 && (_via.PCR & 0x0C) == 0x04)
+        if ((_via.PCR & 0x0C) != 0x04)
         {
-            if ((_via.IC32State & MachineConstants.Ic32Constants.Ic32KeyboardWrite) != 0)
+            return; // Only trigger on positive edge
+        }
+
+        // Always update LastScanCycle if possible — not just when firing IRQs
+        if ((_via.IC32State & MachineConstants.Ic32Constants.Ic32KeyboardWrite) != 0)
+        {
+            _keyboardMatrix.MarkFullScan();
+        }
+        else if (_kbdCol < 15)
+        {
+            for (var row = 1; row < 8; row++)
             {
-                _via.IFR |= MachineConstants.InterruptBits.CA2;
-                UpdateIFRTopBit();
-            }
-            else if (_kbdCol < 15)
-            {
-                for (var row = 1; row < 8; row++)
+                if (_keyboardMatrix.IsKeyActive(row, _kbdCol))
                 {
-                    if (_keyboardState[_kbdCol, row])
-                    {
-                        _via.IFR |= MachineConstants.InterruptBits.CA2;
-                        UpdateIFRTopBit();
-                        break;
-                    }
+                    _keyboardMatrix.OnKeyScan(row, _kbdCol);
+                }
+            }
+        }
+
+        // Now do the IRQ logic — but scanning always happens above
+        if (!_keyboardMatrix.AnyKeyActive())
+        {
+            return;
+        }
+
+        if ((_via.IC32State & MachineConstants.Ic32Constants.Ic32KeyboardWrite) != 0)
+        {
+            _via.IFR |= MachineConstants.InterruptBits.CA2;
+            UpdateIFRTopBit();
+        }
+        else if (_kbdCol < 15)
+        {
+            for (var row = 1; row < 8; row++)
+            {
+                if (_keyboardMatrix.IsKeyActive(row, _kbdCol))
+                {
+                    _via.IFR |= MachineConstants.InterruptBits.CA2;
+                    UpdateIFRTopBit();
+                    break;
                 }
             }
         }
     }
+
 
     private void IC32Write(byte value)
     {
@@ -590,8 +566,8 @@ public class SysVia
             _via.IC32State &= (byte)~(1 << bit);
         }
 
-        _capsLockHandler?.Invoke((_via.IC32State & MachineConstants.Ic32Constants.Ic32CapsLock) == 01);
-        _capsLockHandler?.Invoke((_via.IC32State & MachineConstants.Ic32Constants.Ic32ShiftLock) == 01);
+        _capsLockHandler?.Invoke((_via.IC32State & MachineConstants.Ic32Constants.Ic32CapsLock) == 0);
+        _shiftLockHandler?.Invoke((_via.IC32State & MachineConstants.Ic32Constants.Ic32ShiftLock) == 0);
 
         // Must do sound reg access when write line changes
         if ((prevIC32State & MachineConstants.Ic32Constants.Ic32SoundWrite) == 0 &&

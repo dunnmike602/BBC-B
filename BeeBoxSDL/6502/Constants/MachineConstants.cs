@@ -1,4 +1,4 @@
-﻿namespace MLDComputing.Emulators.BBCSim._6502.Constants;
+﻿namespace BeeBoxSDL._6502.Constants;
 
 public static class MachineConstants
 {
@@ -22,7 +22,6 @@ public static class MachineConstants
     {
         public const int BbcProcessorSpeed = 2_000_000;
         public const int BbcFrameRate = 50;
-        public const int TeletextBuffer = 1024;
     }
 
     public static class BitPatterns

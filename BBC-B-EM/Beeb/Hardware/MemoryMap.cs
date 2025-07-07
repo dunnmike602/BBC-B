@@ -13,9 +13,11 @@ public class MemoryMap(RomBank romBank, IoDevices io, OsRom osRom)
 
     public byte ReadByte(ushort address)
     {
-        if (address > 0x4000 && address < 0x6000)
+        // Mode 7 screen RAM
+        if (address >= 0x7C00 && address <= 0x7FFF)
         {
-            return _ram[address];
+            var offset = address - 0x7C00;
+            return _videoBuffer[offset];
         }
 
         // 0000–7FFF: main RAM
@@ -24,27 +26,28 @@ public class MemoryMap(RomBank romBank, IoDevices io, OsRom osRom)
             return _ram[address];
         }
 
-        // 8000–BFFF: sideways paged ROM
+        // 8000–BFFF: sideways ROM
         if (address < 0xC000)
         {
             return romBank.Read(address);
         }
 
-        // C000–FBFF: OS ROM (this includes BASIC, MOS, language ROMs, etc.)
+        // C000–FBFF: OS ROM
         if (address < 0xFC00)
         {
             return osRom.Read(address);
         }
 
-        // FC00–FDFF: I/O region (Video ULA, VIA, disc controller…)
+        // FC00–FEFF: I/O
         if (address < 0xFF00)
         {
             return io.Read(address);
         }
 
-        // FE00–FFFF: vectors and the “top” of the OS ROM
+        // FF00–FFFF: OS vectors
         return osRom.Read(address);
     }
+
 
     public void WriteByte(ushort address, byte value)
     {
