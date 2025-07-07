@@ -8,7 +8,7 @@ using Hardware;
 
 public class BeebEm
 {
-    private readonly long _frameIntervalTicks = Stopwatch.Frequency / 50;
+    private readonly long _frameIntervalTicks = Stopwatch.Frequency / 100;
 
     public double CpuSpeedMhz;
 
@@ -118,11 +118,21 @@ public class BeebEm
             FrameCount++;
 
             // Wait until next frame deadline
-            var spinner = new SpinWait();
-            while (Stopwatch.GetTimestamp() < targetTicks)
-            {
-                spinner.SpinOnce();
-            }
+            // var spinner = new SpinWait();
+            //  while (Stopwatch.GetTimestamp() < targetTicks)
+            //  {
+            //    spinner.SpinOnce();
+            // }
+
+            // Update VIA timer based on real elapsed time
+            var now = Stopwatch.GetTimestamp();
+            var elapsedTicks = now - lastStopwatchTimestamp;
+            lastStopwatchTimestamp = now;
+
+            var elapsedMicroseconds = elapsedTicks * 1_000_000 / Stopwatch.Frequency;
+            viaTicksPending += elapsedMicroseconds;
+
+            SystemVia.Tick((uint)viaTicksPending);
 
             FrameReady?.Invoke(this,
                 new FrameReadyEventArgs { FrameCount = FrameCount, CpuSpeedMhz = CpuSpeedMhz, FrameRate = FrameRate });
